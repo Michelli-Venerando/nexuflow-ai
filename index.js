@@ -1,14 +1,63 @@
-// rota principal
+import express from "express";
+import OpenAI from "openai";
+import dotenv from "dotenv";
+import fetch from "node-fetch";
+
+dotenv.config();
+
+// ✅ CRIAR APP PRIMEIRO
+const app = express();
+app.use(express.json());
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// 🔹 IA interpreta texto
+async function interpretar(texto) {
+  const resposta = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [
+      {
+        role: "system",
+        content: `
+Extraia dados financeiros e retorne JSON com:
+tipo (pagar ou receber)
+descricao
+valor
+data (YYYY-MM-DD)
+`
+      },
+      { role: "user", content: texto }
+    ]
+  });
+
+  return JSON.parse(resposta.choices[0].message.content);
+}
+
+// 🔹 Salva no banco
+async function salvar(dados) {
+  const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY,
+      "Prefer": "return=representation"
+    },
+    body: JSON.stringify(dados)
+  });
+
+  const result = await response.text();
+  console.log("Resposta Supabase:", result);
+}
+
+// 🔹 Rota webhook
 app.post("/webhook", async (req, res) => {
   try {
     const texto = req.body.text;
 
-    const dados = {
-      tipo: "pagar",
-      descricao: "teste manual",
-      valor: 100,
-      data: "2026-03-23"
-    };
+    const dados = await interpretar(texto);
 
     await salvar(dados);
 
@@ -19,7 +68,7 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// 👇 NOVA ROTA AQUI
+// 🔹 Rota transações
 app.get("/transacoes", async (req, res) => {
   try {
     const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
@@ -38,7 +87,7 @@ app.get("/transacoes", async (req, res) => {
   }
 });
 
-// 👇 NÃO MEXER AQUI
+// 🔹 Porta (Render)
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
