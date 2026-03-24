@@ -2,18 +2,33 @@ import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
-// ✅ CRIAR APP PRIMEIRO
+// ============================
+// CONFIGURAÇÃO BÁSICA
+// ============================
+
 const app = express();
 app.use(express.json());
+
+// necessário para usar index.html no mesmo projeto
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// libera arquivos estáticos (index.html)
+app.use(express.static(__dirname));
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// 🔹 IA interpreta texto
+// ============================
+// FUNÇÃO IA - interpreta texto
+// ============================
+
 async function interpretar(texto) {
   const resposta = await openai.chat.completions.create({
     model: "gpt-4.1",
@@ -35,7 +50,10 @@ data (YYYY-MM-DD)
   return JSON.parse(resposta.choices[0].message.content);
 }
 
-// 🔹 Salva no banco
+// ============================
+// SALVAR NO SUPABASE
+// ============================
+
 async function salvar(dados) {
   const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
     method: "POST",
@@ -52,7 +70,10 @@ async function salvar(dados) {
   console.log("Resposta Supabase:", result);
 }
 
-// 🔹 Rota webhook
+// ============================
+// ROTA WEBHOOK (IA + SALVAR)
+// ============================
+
 app.post("/webhook", async (req, res) => {
   try {
     const texto = req.body.text;
@@ -64,11 +85,14 @@ app.post("/webhook", async (req, res) => {
     res.send("Salvo com sucesso");
   } catch (erro) {
     console.error(erro);
-    res.status(500).send("Erro");
+    res.status(500).send("Erro ao salvar");
   }
 });
 
-// 🔹 Rota transações
+// ============================
+// ROTA PARA BUSCAR TRANSAÇÕES
+// ============================
+
 app.get("/transacoes", async (req, res) => {
   try {
     const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
@@ -87,7 +111,18 @@ app.get("/transacoes", async (req, res) => {
   }
 });
 
-// 🔹 Porta (Render)
+// ============================
+// ROTA INICIAL (ABRE O PAINEL)
+// ============================
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// ============================
+// INICIAR SERVIDOR
+// ============================
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
