@@ -34,7 +34,7 @@ async function carregar() {
       <td>${item.tipo}</td>
       <td>${item.descricao}</td>
       <td>R$ ${item.valor}</td>
-      <td>${new Date(item.data).toLocaleDateString("pt-BR")}</td>
+      <td>${item.data.split("-").reverse().join("/")}</td>
       <td>${item.status}</td>
     `;
 
