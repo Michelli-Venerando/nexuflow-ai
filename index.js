@@ -41,6 +41,8 @@ tipo (pagar ou receber)
 descricao
 valor
 data (YYYY-MM-DD)
+Considere que hoje é ${new Date().toISOString().split('T')[0]}.
+Se o texto mencionar "hoje", use essa data.
 `
       },
       { role: "user", content: texto }
