@@ -41,8 +41,7 @@ tipo (pagar ou receber)
 descricao
 valor
 data (YYYY-MM-DD)
-Considere que hoje é ${new Date().toISOString().split('T')[0]}.
-Se o texto mencionar "hoje", use essa data.
+NÃO retorne data.
 `
       },
       { role: "user", content: texto }
@@ -51,7 +50,6 @@ Se o texto mencionar "hoje", use essa data.
 
   return JSON.parse(resposta.choices[0].message.content);
 }
-
 // ============================
 // SALVAR NO SUPABASE
 // ============================
@@ -80,7 +78,15 @@ app.post("/webhook", async (req, res) => {
   try {
     const texto = req.body.text;
 
-    const dados = await interpretar(texto);
+    const dadosIA = await interpretar(texto);
+
+    // 📅 DATA BRASIL
+    const hoje = new Date().toLocaleDateString("pt-BR").split("/").reverse().join("-");
+
+    const dados = {
+      ...dadosIA,
+      data: hoje
+    };
 
     await salvar(dados);
 
