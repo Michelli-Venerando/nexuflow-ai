@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Painel Nexuflow</title>
+</head>
+<body>
+
+<h1>💰 Painel Financeiro</h1>
+
+<table border="1" id="tabela">
+  <thead>
+    <tr>
+      <th>Tipo</th>
+      <th>Descrição</th>
+      <th>Valor</th>
+      <th>Data</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<script>
+async function carregar() {
+  const res = await fetch("/transacoes");
+  const dados = await res.json();
+
+  const tbody = document.querySelector("#tabela tbody");
+
+  dados.forEach(item => {
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${item.tipo}</td>
+      <td>${item.descricao}</td>
+      <td>R$ ${item.valor}</td>
+      <td>${item.data}</td>
+      <td>${item.status}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+carregar();
+</script>
+
+</body>
+</html>
