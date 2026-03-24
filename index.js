@@ -13,6 +13,7 @@ dotenv.config();
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // necessário para usar index.html no mesmo projeto
 const __filename = fileURLToPath(import.meta.url);
