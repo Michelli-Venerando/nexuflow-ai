@@ -183,23 +183,41 @@ const supabaseClient = createClient(
 // verificar login
 async function verificarLogin() {
 
-// 🔥 CAPTURA TOKEN DA URL (RESET DE SENHA)
-const hash = window.location.hash;
+  const hash = window.location.hash;
 
-if (hash && hash.includes("access_token")) {
-  const params = new URLSearchParams(hash.replace("#", ""));
+  if (hash && hash.includes("access_token")) {
+    const params = new URLSearchParams(hash.replace("#", ""));
 
-  const access_token = params.get("access_token");
-  const refresh_token = params.get("refresh_token");
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
 
-  if (access_token && refresh_token) {
-    await supabaseClient.auth.setSession({
-      access_token,
-      refresh_token
-    });
+    if (access_token && refresh_token) {
+      await supabaseClient.auth.setSession({
+        access_token,
+        refresh_token
+      });
 
-    // ✅ LIMPA A URL (AQUI É O LUGAR CERTO)
-    window.history.replaceState({}, document.title, "/");
+      // 🔥 IMPORTANTE: espera a sessão estabilizar
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      window.history.replaceState({}, document.title, "/");
+    }
+  }
+
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    localStorage.setItem("token", data.session.access_token);
+
+    document.getElementById("login-container").style.display = "none";
+
+    if (window.location.hash.includes("type=recovery")) {
+      document.getElementById("reset-container").style.display = "flex";
+      return;
+    }
+
+    document.getElementById("app").style.display = "block";
+    carregar();
   }
 }
 
@@ -276,11 +294,20 @@ verificarRecovery();
 async function alterarSenha() {
   const novaSenha = document.getElementById("novaSenha").value;
 
+  // 🔥 garante sessão ativa
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (!data.session) {
+    alert("Sessão inválida, gere um novo link de recuperação.");
+    return;
+  }
+
   const { error } = await supabaseClient.auth.updateUser({
     password: novaSenha
   });
 
   if (error) {
+    console.error(error);
     alert("Erro ao alterar senha");
     return;
   }
@@ -292,7 +319,6 @@ async function alterarSenha() {
 
   carregar();
 }
-
 window.alterarSenha = alterarSenha;
 
 // carregar dados
