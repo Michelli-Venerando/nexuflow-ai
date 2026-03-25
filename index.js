@@ -32,8 +32,29 @@ app.get("/", (req, res) => {
 // API de dados
 app.get("/transacoes", async (req, res) => {
   try {
+    const token = req.headers.authorization;
+
+    if (!token) {
+      return res.status(401).send("Não autorizado");
+    }
+
+    // 🔥 pega usuário logado
+    const userResponse = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          "Authorization": token,
+          "apikey": process.env.SUPABASE_KEY
+        }
+      }
+    );
+
+    const userData = await userResponse.json();
+
+    // 🔥 busca só dados do usuário
     const response = await fetch(
-      process.env.SUPABASE_URL + "/rest/v1/transacoes?select=*",
+      process.env.SUPABASE_URL +
+        "/rest/v1/transacoes?select=*&cliente_id=eq." + userData.id,
       {
         headers: {
           "apikey": process.env.SUPABASE_KEY,
@@ -74,17 +95,40 @@ data (YYYY-MM-DD)
 }
 
 // salvar no Supabase
-async function salvar(dados) {
-  const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": process.env.SUPABASE_KEY,
-      "Authorization": "Bearer " + process.env.SUPABASE_KEY,
-      "Prefer": "return=representation"
-    },
-    body: JSON.stringify(dados)
-  });
+async function salvar(dados, token) {
+
+  // 🔥 pega usuário
+  const userResponse = await fetch(
+    process.env.SUPABASE_URL + "/auth/v1/user",
+    {
+      headers: {
+        "Authorization": token,
+        "apikey": process.env.SUPABASE_KEY
+      }
+    }
+  );
+
+  const userData = await userResponse.json();
+
+  // adiciona dono do registro
+  dados.cliente_id = userData.id;
+
+  const response = await fetch(
+    process.env.SUPABASE_URL + "/rest/v1/transacoes",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": process.env.SUPABASE_KEY,
+        "Authorization": "Bearer " + process.env.SUPABASE_KEY
+      },
+      body: JSON.stringify(dados)
+    }
+  );
+
+  const result = await response.text();
+  console.log("Resposta Supabase:", result);
+}
 
   const result = await response.text();
   console.log("Resposta Supabase:", result);
@@ -99,7 +143,9 @@ app.post("/webhook", async (req, res) => {
 
     const dados = await interpretar(texto);
 
-    await salvar(dados);
+    // ⚠️ aqui ainda não temos usuário (WhatsApp)
+    // então salva sem cliente_id por enquanto
+    await salvar(dados, process.env.SUPABASE_KEY);
 
     res.send("OK");
   } catch (erro) {
