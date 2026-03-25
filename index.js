@@ -24,6 +24,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // servir o HTML
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
+// API de dados
 app.get("/transacoes", async (req, res) => {
   try {
     const response = await fetch(
