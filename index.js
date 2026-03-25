@@ -130,10 +130,6 @@ async function salvar(dados, token) {
   console.log("Resposta Supabase:", result);
 }
 
-  const result = await response.text();
-  console.log("Resposta Supabase:", result);
-}
-
 // webhook Twilio
 app.post("/webhook", async (req, res) => {
   try {
