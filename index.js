@@ -1,27 +1,81 @@
 import express from "express";
+import OpenAI from "openai";
 import dotenv from "dotenv";
+import fetch from "node-fetch";
 
 dotenv.config();
 
 const app = express();
 
-// IMPORTANTE: suportar JSON e form-data (Twilio usa isso)
+// suportar JSON e form-data (Twilio)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ROTA TESTE (pra ver se servidor está online)
+// OpenAI
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// rota teste
 app.get("/", (req, res) => {
   res.send("Servidor Nexuflow rodando 🚀");
 });
 
-// 🔥 WEBHOOK (DEBUG)
-app.post("/webhook", (req, res) => {
-  console.log("🔥 CHEGOU DO TWILIO 🔥");
-  console.log("Headers:", req.headers);
-  console.log("Body:", req.body);
+// IA interpreta texto
+async function interpretar(texto) {
+  const resposta = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [
+      {
+        role: "system",
+        content: `
+Extraia dados financeiros e retorne JSON:
+tipo (pagar ou receber)
+descricao
+valor
+data (YYYY-MM-DD)
+`
+      },
+      { role: "user", content: texto }
+    ]
+  });
 
-  // resposta simples pro Twilio
-  res.send("OK");
+  return JSON.parse(resposta.choices[0].message.content);
+}
+
+// salvar no Supabase
+async function salvar(dados) {
+  const response = await fetch(process.env.SUPABASE_URL + "/rest/v1/transacoes", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY,
+      "Prefer": "return=representation"
+    },
+    body: JSON.stringify(dados)
+  });
+
+  const result = await response.text();
+  console.log("Resposta Supabase:", result);
+}
+
+// webhook Twilio
+app.post("/webhook", async (req, res) => {
+  try {
+    const texto = req.body.Body;
+
+    console.log("Mensagem recebida:", texto);
+
+    const dados = await interpretar(texto);
+
+    await salvar(dados);
+
+    res.send("OK");
+  } catch (erro) {
+    console.error("Erro:", erro);
+    res.status(500).send("Erro");
+  }
 });
 
 const PORT = process.env.PORT || 3000;
