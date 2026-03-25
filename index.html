@@ -182,19 +182,43 @@ const supabaseClient = createClient(
 
 // verificar login
 async function verificarLogin() {
+
+  // 🔥 CAPTURA TOKEN DA URL (RESET DE SENHA)
+  const hash = window.location.hash;
+
+  if (hash && hash.includes("access_token")) {
+    const params = new URLSearchParams(hash.replace("#", ""));
+
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+
+    if (access_token && refresh_token) {
+      await supabaseClient.auth.setSession({
+        access_token,
+        refresh_token
+      });
+    }
+  }
+
+  // 🔐 verifica sessão
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
     localStorage.setItem("token", data.session.access_token);
 
     document.getElementById("login-container").style.display = "none";
+
+    // 🔥 se for recovery, mostra tela de nova senha
+    if (window.location.hash.includes("type=recovery")) {
+      document.getElementById("reset-container").style.display = "flex";
+      return;
+    }
+
     document.getElementById("app").style.display = "block";
 
     carregar();
   }
 }
-
-verificarLogin();
 
 // login
 async function login() {
