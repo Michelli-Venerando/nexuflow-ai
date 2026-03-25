@@ -24,8 +24,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // servir o HTML
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+app.get("/transacoes", async (req, res) => {
+  try {
+    const response = await fetch(
+      process.env.SUPABASE_URL + "/rest/v1/transacoes?select=*",
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY
+        }
+      }
+    );
+
+    const data = await response.json();
+
+    res.json(data);
+  } catch (erro) {
+    console.error("Erro ao buscar dados:", erro);
+    res.status(500).send("Erro ao buscar dados");
+  }
 });
 
 // IA interpreta texto
