@@ -52,6 +52,15 @@
 </head>
 <body>
 
+<div id="login">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"><br><br>
+  <input id="senha" type="password" placeholder="Senha"><br><br>
+  <button onclick="login()">Entrar</button>
+</div>
+
+<div id="app" style="display:none;">
+
 <h1>💰 Painel Financeiro Nexuflow</h1>
 
 <div class="cards">
@@ -75,15 +84,56 @@
   <tbody id="tabela"></tbody>
 </table>
 
-<script>
+<script type="module">
+
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+const supabase = createClient(
+  "https://zwwdeetzpwrbtiyvfsjj.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
+);
+
+// 🔐 LOGIN
+async function login() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password: senha
+  });
+
+  if (error) {
+    alert("Erro no login");
+    return;
+  }
+
+  localStorage.setItem("token", data.session.access_token);
+
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  carregar();
+}
+
+// necessário por causa do type="module"
+window.login = login;
+
+// 📊 CARREGAR DADOS
 async function carregar() {
-  const res = await fetch("/transacoes");
+  const res = await fetch("/transacoes", {
+    headers: {
+      Authorization: "Bearer " + localStorage.getItem("token")
+    }
+  });
+
   const dados = await res.json();
 
   let totalPagar = 0;
   let totalReceber = 0;
 
   const tbody = document.getElementById("tabela");
+  tbody.innerHTML = "";
 
   dados.forEach(item => {
     const valor = Number(item.valor);
@@ -107,12 +157,10 @@ async function carregar() {
     tbody.appendChild(tr);
   });
 
-  // KPIs
   document.getElementById("pagar").innerText = totalPagar.toFixed(2);
   document.getElementById("receber").innerText = totalReceber.toFixed(2);
   document.getElementById("saldo").innerText = (totalReceber - totalPagar).toFixed(2);
 
-  // Gráfico
   const ctx = document.getElementById("grafico");
 
   new Chart(ctx, {
@@ -127,8 +175,7 @@ async function carregar() {
   });
 }
 
-carregar();
 </script>
-
+</div>
 </body>
 </html>
