@@ -6,6 +6,7 @@ import fetch from "node-fetch";
 dotenv.config();
 
 const app = express();
+app.use(express.static("."));
 
 // suportar JSON e form-data (Twilio)
 app.use(express.json());
