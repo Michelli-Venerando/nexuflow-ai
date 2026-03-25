@@ -106,4 +106,9 @@ app.post("/webhook", async (req, res) => {
     console.error("Erro:", erro);
     res.status(500).send("Erro");
   }
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log("Servidor rodando na porta " + PORT);
 });
