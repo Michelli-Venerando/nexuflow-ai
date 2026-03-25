@@ -129,6 +129,7 @@
     <input id="senha" type="password" placeholder="Senha">
 
     <button onclick="login()">Entrar</button>
+	<button onclick="logout()" style="float:right;">Sair</button>
   </div>
 </div>
 
@@ -166,6 +167,22 @@ const supabase = createClient(
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
 );
 
+//Verificar login
+async function verificarLogin() {
+  const { data } = await supabase.auth.getSession();
+
+  if (data.session) {
+    localStorage.setItem("token", data.session.access_token);
+
+    document.getElementById("login").style.display = "none";
+    document.getElementById("app").style.display = "block";
+
+    carregar();
+  }
+}
+
+verificarLogin();
+
 // 🔐 LOGIN
 async function login() {
   const email = document.getElementById("email").value;
@@ -191,6 +208,18 @@ async function login() {
 
 // necessário por causa do type="module"
 window.login = login;
+
+// 🔐 LOGOUT
+async function logout() {
+  await supabase.auth.signOut();
+
+  localStorage.removeItem("token");
+
+  document.getElementById("login").style.display = "block";
+  document.getElementById("app").style.display = "none";
+}
+
+window.logout = logout;
 
 // 📊 CARREGAR DADOS
 async function carregar() {
