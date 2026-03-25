@@ -16,9 +16,16 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// rota teste
+// servir o HTML
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// servir o HTML
 app.get("/", (req, res) => {
-  res.send("Servidor Nexuflow rodando 🚀");
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 // IA interpreta texto
