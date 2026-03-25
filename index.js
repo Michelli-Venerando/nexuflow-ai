@@ -99,46 +99,6 @@ app.post("/webhook", async (req, res) => {
 
     const dados = await interpretar(texto);
 
-// pega o usuário do token
-
-const userResponse = await fetch(
-  process.env.SUPABASE_URL + "/auth/v1/user",
-  {
-    headers: {
-      "Authorization": token,
-      "apikey": process.env.SUPABASE_KEY
-    }
-  }
-);
-
-const userData = await userResponse.json();
-
-// filtra por cliente_id
-const response = await fetch(
-  process.env.SUPABASE_URL + "/rest/v1/transacoes?cliente_id=eq." + userData.id,
-  {
-    headers: {
-      "apikey": process.env.SUPABASE_KEY,
-      "Authorization": token
-    }
-  }
-);
-
-const userResponse = await fetch(
-  process.env.SUPABASE_URL + "/auth/v1/user",
-  {
-    headers: {
-      "Authorization": token,
-      "apikey": process.env.SUPABASE_KEY
-    }
-  }
-);
-
-const userData = await userResponse.json();
-
-// adiciona cliente_id
-dados.cliente_id = userData.id;
-
     await salvar(dados);
 
     res.send("OK");
@@ -146,10 +106,4 @@ dados.cliente_id = userData.id;
     console.error("Erro:", erro);
     res.status(500).send("Erro");
   }
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Servidor rodando na porta " + PORT);
 });
