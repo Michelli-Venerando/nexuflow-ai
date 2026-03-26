@@ -156,3 +156,44 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("Servidor rodando na porta " + PORT);
 });
+
+//CARREGAR PERFIL
+app.get("/perfil", async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+
+    const userResponse = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          "Authorization": token,
+          "apikey": process.env.SUPABASE_KEY
+        }
+      }
+    );
+
+    const userData = await userResponse.json();
+
+    // 🔥 buscar perfil na tabela usuarios
+    const perfilResponse = await fetch(
+      process.env.SUPABASE_URL +
+        "/rest/v1/usuarios?id=eq." + userData.id,
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY
+        }
+      }
+    );
+
+    const perfilData = await perfilResponse.json();
+
+    res.json({
+      perfil: perfilData[0]?.perfil || "master"
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erro ao buscar perfil");
+  }
+});

@@ -285,15 +285,46 @@ async function alterarSenha() {
 
 window.alterarSenha = alterarSenha;
 
+//BUSCAR PERFIL
+async function buscarPerfil() {
+  const token = localStorage.getItem("token");
+
+  const res = await fetch("/perfil", {
+    headers: {
+      Authorization: "Bearer " + token
+    }
+  });
+
+  const data = await res.json();
+
+  return data.perfil; // pagar | receber | master
+}
+
 // CARREGAR DADOS
 async function carregar() {
+  const perfil = await buscarPerfil();
+
   const res = await fetch("/transacoes", {
     headers: {
       Authorization: "Bearer " + localStorage.getItem("token")
     }
   });
 
-  const dados = await res.json();
+  let dados = await res.json();
+
+  // 🔥 FILTRO POR PERFIL
+  if (perfil === "pagar") {
+    dados = dados.filter(item => item.tipo === "pagar");
+  }
+
+  if (perfil === "receber") {
+    dados = dados.filter(item => item.tipo === "receber");
+  }
+
+  // master vê tudo (sem filtro)
+  if (perfil === "master") {
+    console.log("Modo diretoria ativo");
+  }
 
   let totalPagar = 0;
   let totalReceber = 0;
@@ -336,8 +367,6 @@ async function carregar() {
   });
 }
 
-// 🚀 INICIAR
-verificarLogin();
 
 </script>
 
