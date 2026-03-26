@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Painel Nexuflow</title>
+  <title>Painel Financeiro - Nexuflow</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -11,8 +11,8 @@
       background: #f5f5f5;
     }
 
-    /* FUNDO LOGIN */
-    #login-container {
+    /* FUNDO LOGIN E RESET */
+    #login-container, #reset-container {
       height: 100vh;
       background: url("/Imagens/plano-fundo.png") no-repeat center center;
       background-size: cover;
@@ -21,7 +21,7 @@
       align-items: center;
     }
 
-    #login-container::before {
+    #login-container::before, #reset-container::before {
       content: "";
       position: absolute;
       width: 100%;
@@ -29,7 +29,7 @@
       background: rgba(0,0,0,0.5);
     }
 
-    /* BOX LOGIN / RESET */
+    /* BOX */
     .login-box {
       position: relative;
       z-index: 1;
@@ -58,6 +58,12 @@
       border-radius: 6px;
       cursor: pointer;
       font-weight: bold;
+    }
+
+    .erro {
+      color: red;
+      font-size: 14px;
+      margin-bottom: 10px;
     }
 
     /* APP */
@@ -103,16 +109,20 @@
     <input id="email" type="email" placeholder="Email">
     <input id="senha" type="password" placeholder="Senha">
 
+    <p id="erroLogin" class="erro"></p>
+
     <button onclick="login()">Entrar</button>
   </div>
 </div>
 
 <!-- RESET SENHA -->
-<div id="reset-container" style="display:none; height:100vh; align-items:center; justify-content:center;">
+<div id="reset-container" style="display:none;">
   <div class="login-box">
     <h2>Nova Senha</h2>
 
     <input id="novaSenha" type="password" placeholder="Digite a nova senha">
+
+    <p id="erroSenha" class="erro"></p>
 
     <button onclick="alterarSenha()">Salvar nova senha</button>
   </div>
@@ -163,7 +173,6 @@ async function verificarLogin() {
 
   const hash = window.location.hash;
 
-  // captura tokens do email
   if (hash && hash.includes("access_token")) {
     const params = new URLSearchParams(hash.replace("#", ""));
 
@@ -187,7 +196,6 @@ async function verificarLogin() {
 
     document.getElementById("login-container").style.display = "none";
 
-    // se for reset de senha
     if (hash.includes("type=recovery")) {
       document.getElementById("reset-container").style.display = "flex";
       return;
@@ -202,6 +210,9 @@ async function verificarLogin() {
 async function login() {
   const email = document.getElementById("email").value;
   const senha = document.getElementById("senha").value;
+  const erro = document.getElementById("erroLogin");
+
+  erro.innerText = "";
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email,
@@ -209,7 +220,7 @@ async function login() {
   });
 
   if (error) {
-    alert("Erro no login");
+    erro.innerText = "Email ou senha inválidos";
     return;
   }
 
@@ -238,11 +249,14 @@ window.logout = logout;
 // ALTERAR SENHA
 async function alterarSenha() {
   const novaSenha = document.getElementById("novaSenha").value;
+  const erroMsg = document.getElementById("erroSenha");
+
+  erroMsg.innerText = "";
 
   const { data } = await supabaseClient.auth.getSession();
 
   if (!data.session) {
-    alert("Sessão inválida, gere novo link.");
+    erroMsg.innerText = "Sessão inválida. Gere um novo link.";
     return;
   }
 
@@ -251,8 +265,13 @@ async function alterarSenha() {
   });
 
   if (error) {
-    console.error(error);
-    alert("Erro ao alterar senha");
+    if (error.message.includes("different from the old password")) {
+      erroMsg.innerText = "A nova senha deve ser diferente da anterior.";
+    } else if (error.message.includes("Password should be at least")) {
+      erroMsg.innerText = "A senha deve ter pelo menos 6 caracteres.";
+    } else {
+      erroMsg.innerText = "Erro ao alterar senha.";
+    }
     return;
   }
 
@@ -317,7 +336,7 @@ async function carregar() {
   });
 }
 
-// 🚀 INICIA
+// 🚀 INICIAR
 verificarLogin();
 
 </script>
