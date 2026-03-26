@@ -177,7 +177,7 @@ app.get("/perfil", async (req, res) => {
     // 🔥 buscar perfil na tabela usuarios
     const perfilResponse = await fetch(
       process.env.SUPABASE_URL +
-        "/rest/v1/usuarios?id=eq." + userData.id,
+        "/rest/v1/usuarios?email=eq." + userData.email
       {
         headers: {
           "apikey": process.env.SUPABASE_KEY,
