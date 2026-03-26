@@ -1,87 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
-<!-- Painel Financeiro - Nexuflow -->
   <title>Painel Nexuflow</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body {
       font-family: Arial;
       margin: 0;
       background: #f5f5f5;
     }
-	
-	
-	/* fundo */
-	#login-container {
-		height: 100vh;
-		background: url("/Imagens/plano-fundo.png") no-repeat center center;
-		background-size: cover;
 
-		display: flex;
-		justify-content: center;
-		align-items: center;
-	}
-	
-	/* efeito escuro */
-	#login-container::before {
-		content: "";
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		background: rgba(0,0,0,0.5);
-	}
-
-	/* box */
-	.login-box {
-		position: relative;
-		z-index: 1;
-
-		background: rgba(255,255,255,0.95);
-		padding: 40px;
-		border-radius: 12px;
-		width: 300px;
-		text-align: center;
-
-		box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-	}
-
-	.login-box h2 {
-		margin-bottom: 10px;
-	}
-
-	.login-box p {
-		font-size: 14px;
-		margin-bottom: 20px;
-		color: #666;
-	}
-
-	.login-box input {
-		width: 100%;
-		padding: 10px;
-		margin-bottom: 15px;
-		border-radius: 6px;
-		border: 1px solid #ccc;
-	}
-
-	.login-box button {
-		width: 100%;
-		padding: 10px;
-		border: none;
-		background: #4CAF50;
-		color: white;
-		border-radius: 6px;
-		cursor: pointer;
-		font-weight: bold;
-	}
-
-	.login-box button:hover {
-		background: #45a049;
-	}
-
-    h1 {
-      text-align: center;
+    /* FUNDO LOGIN */
+    #login-container {
+      height: 100vh;
+      background: url("/Imagens/plano-fundo.png") no-repeat center center;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
+
+    #login-container::before {
+      content: "";
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+    }
+
+    /* BOX LOGIN / RESET */
+    .login-box {
+      position: relative;
+      z-index: 1;
+      background: rgba(255,255,255,0.95);
+      padding: 40px;
+      border-radius: 12px;
+      width: 300px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    /* APP */
+    h1 { text-align: center; }
 
     .cards {
       display: flex;
@@ -95,7 +75,6 @@
       background: white;
       border-radius: 10px;
       text-align: center;
-      font-size: 18px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
@@ -111,20 +90,15 @@
       border-bottom: 1px solid #ddd;
       text-align: center;
     }
-
-    canvas {
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-    }
   </style>
 </head>
+
 <body>
 
+<!-- LOGIN -->
 <div id="login-container">
   <div class="login-box">
     <h2>Nexuflow</h2>
-    <p>Controle financeiro inteligente</p>
 
     <input id="email" type="email" placeholder="Email">
     <input id="senha" type="password" placeholder="Senha">
@@ -133,7 +107,8 @@
   </div>
 </div>
 
-<div id="reset-container" style="display:none;">
+<!-- RESET SENHA -->
+<div id="reset-container" style="display:none; height:100vh; align-items:center; justify-content:center;">
   <div class="login-box">
     <h2>Nova Senha</h2>
 
@@ -143,7 +118,8 @@
   </div>
 </div>
 
-<div id="app" style="display:none;">
+<!-- APP -->
+<div id="app" style="display:none; padding:20px;">
 
 <button onclick="logout()" style="float:right;">Sair</button>
 
@@ -170,6 +146,8 @@
   <tbody id="tabela"></tbody>
 </table>
 
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 <script>
 
@@ -177,14 +155,15 @@ const { createClient } = supabase;
 
 const supabaseClient = createClient(
   "https://zwwdeetzpwrbtiyvfsjj.supabase.co",
-  "SUA_CHAVE_AQUI"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
 );
 
-// verificar login
+// 🔐 VERIFICAR LOGIN / RESET
 async function verificarLogin() {
 
   const hash = window.location.hash;
 
+  // captura tokens do email
   if (hash && hash.includes("access_token")) {
     const params = new URLSearchParams(hash.replace("#", ""));
 
@@ -197,10 +176,7 @@ async function verificarLogin() {
         refresh_token
       });
 
-      // 🔥 IMPORTANTE: espera a sessão estabilizar
       await new Promise(resolve => setTimeout(resolve, 500));
-
-      window.history.replaceState({}, document.title, "/");
     }
   }
 
@@ -211,7 +187,8 @@ async function verificarLogin() {
 
     document.getElementById("login-container").style.display = "none";
 
-    if (window.location.hash.includes("type=recovery")) {
+    // se for reset de senha
+    if (hash.includes("type=recovery")) {
       document.getElementById("reset-container").style.display = "flex";
       return;
     }
@@ -221,27 +198,7 @@ async function verificarLogin() {
   }
 }
 
-  // 🔐 verifica sessão
-  const { data } = await supabaseClient.auth.getSession();
-
-  if (data.session) {
-    localStorage.setItem("token", data.session.access_token);
-
-    document.getElementById("login-container").style.display = "none";
-
-    // 🔥 se for recovery, mostra tela de nova senha
-    if (window.location.hash.includes("type=recovery")) {
-      document.getElementById("reset-container").style.display = "flex";
-      return;
-    }
-
-    document.getElementById("app").style.display = "block";
-
-    carregar();
-  }
-}
-
-// login
+// LOGIN
 async function login() {
   const email = document.getElementById("email").value;
   const senha = document.getElementById("senha").value;
@@ -266,39 +223,26 @@ async function login() {
 
 window.login = login;
 
-// logout
+// LOGOUT
 async function logout() {
   await supabaseClient.auth.signOut();
 
   localStorage.removeItem("token");
 
-  document.getElementById("login-container").style.display = "block";
+  document.getElementById("login-container").style.display = "flex";
   document.getElementById("app").style.display = "none";
 }
 
 window.logout = logout;
 
-// detectar recuperação de senha
-function verificarRecovery() {
-  const hash = window.location.hash;
-
-  if (hash.includes("type=recovery")) {
-    document.getElementById("login-container").style.display = "none";
-    document.getElementById("reset-container").style.display = "flex";
-  }
-}
-
-verificarRecovery();
-
-//Alterar senha
+// ALTERAR SENHA
 async function alterarSenha() {
   const novaSenha = document.getElementById("novaSenha").value;
 
-  // 🔥 garante sessão ativa
   const { data } = await supabaseClient.auth.getSession();
 
   if (!data.session) {
-    alert("Sessão inválida, gere um novo link de recuperação.");
+    alert("Sessão inválida, gere novo link.");
     return;
   }
 
@@ -319,9 +263,10 @@ async function alterarSenha() {
 
   carregar();
 }
+
 window.alterarSenha = alterarSenha;
 
-// carregar dados
+// CARREGAR DADOS
 async function carregar() {
   const res = await fetch("/transacoes", {
     headers: {
@@ -340,11 +285,8 @@ async function carregar() {
   dados.forEach(item => {
     const valor = Number(item.valor);
 
-    if (item.tipo === "pagar") {
-      totalPagar += valor;
-    } else {
-      totalReceber += valor;
-    }
+    if (item.tipo === "pagar") totalPagar += valor;
+    else totalReceber += valor;
 
     const tr = document.createElement("tr");
 
@@ -363,9 +305,7 @@ async function carregar() {
   document.getElementById("receber").innerText = totalReceber.toFixed(2);
   document.getElementById("saldo").innerText = (totalReceber - totalPagar).toFixed(2);
 
-  const ctx = document.getElementById("grafico");
-
-  new Chart(ctx, {
+  new Chart(document.getElementById("grafico"), {
     type: "bar",
     data: {
       labels: ["A Pagar", "A Receber"],
@@ -377,7 +317,10 @@ async function carregar() {
   });
 }
 
+// 🚀 INICIA
+verificarLogin();
+
 </script>
-</div>
+
 </body>
 </html>
