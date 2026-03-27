@@ -114,7 +114,7 @@
 </head>
 
 <body>
-<div id="admin-panel" style="display:none; margin-bottom:20px;">
+<!--<div id="admin-panel" style="display:none; margin-bottom:20px;"> -->
 <!-- LOGIN -->
 <div id="login-container">
   <div class="login-box">
@@ -146,30 +146,57 @@
 <div id="boasVindas" style="margin-bottom:10px; font-weight:bold;"></div>
 <div id="app" style="display:none; padding:20px;">
 
-<button onclick="logout()" style="float:right;">Sair</button>
+  <button onclick="logout()" style="float:right;">Sair</button>
 
-<h1>💰 Painel Financeiro Nexuflow</h1>
+  <h1>💰 Painel Financeiro Nexuflow</h1>
 
-<div class="cards">
-  <div class="card">A Pagar: R$ <span id="pagar">0</span></div>
-  <div class="card">A Receber: R$ <span id="receber">0</span></div>
-  <div class="card">Saldo: R$ <span id="saldo">0</span></div>
-</div>
+  <!-- MENU -->
+  <div style="margin-bottom:20px;">
+    <button onclick="abrirPainel('dashboard')">Dashboard</button>
+    <button id="menu-admin" onclick="abrirPainel('usuarios')" style="display:none;">
+      Gestão de Usuários
+    </button>
+  </div>
 
-<canvas id="grafico"></canvas>
+  <!-- DASHBOARD -->
+  <div id="tela-dashboard">
+    <div class="cards">
+      <div class="card">A Pagar: R$ <span id="pagar">0</span></div>
+      <div class="card">A Receber: R$ <span id="receber">0</span></div>
+      <div class="card">Saldo: R$ <span id="saldo">0</span></div>
+    </div>
 
-<table>
-  <thead>
-    <tr>
-      <th>Tipo</th>
-      <th>Descrição</th>
-      <th>Valor</th>
-      <th>Data</th>
-      <th>Status</th>
-    </tr>
-  </thead>
-  <tbody id="tabela"></tbody>
-</table>
+    <canvas id="grafico"></canvas>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tipo</th>
+          <th>Descrição</th>
+          <th>Valor</th>
+          <th>Data</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="tabela"></tbody>
+    </table>
+  </div>
+
+  <!-- ADMIN -->
+  <div id="admin-panel" style="display:none;">
+    <h3>Gestão de Usuários</h3>
+
+    <input id="novoNome" placeholder="Nome"><br><br>
+    <input id="novoEmail" placeholder="Email"><br><br>
+
+    <select id="novoPerfil">
+      <option value="pagar">Contas a Pagar</option>
+      <option value="receber">Contas a Receber</option>
+      <option value="master">Master</option>
+    </select><br><br>
+
+    <button onclick="criarUsuario()">Criar Usuário</button>
+  </div>
 
 </div>
 
@@ -331,7 +358,7 @@ async function carregar() {
 
   // 👇 MOSTRAR ADMIN
   if (perfil === "master") {
-    document.getElementById("admin-panel").style.display = "block";
+    document.getElementById("menu-admin").style.display = "inline-block";
   }
 
   // 👇 FILTROS
@@ -412,7 +439,19 @@ async function criarUsuario() {
   alert("Usuário criado!\nSenha temporária: " + data.senha);
 }
 
+//Navegação entre as telas
+function abrirPainel(tela) {
+  document.getElementById("tela-dashboard").style.display = "none";
+  document.getElementById("admin-panel").style.display = "none";
 
+  if (tela === "dashboard") {
+    document.getElementById("tela-dashboard").style.display = "block";
+  }
+
+  if (tela === "usuarios") {
+    document.getElementById("admin-panel").style.display = "block";
+  }
+}
 
 
 </script>
