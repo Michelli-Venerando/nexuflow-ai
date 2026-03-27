@@ -2,6 +2,20 @@
 <html>
 <head>
   <title>Painel Financeiro - Nexuflow</title>
+  <div id="admin-panel" style="display:none; margin-bottom:20px;">
+  <h3>Gestão de Usuários</h3>
+
+  <input id="novoNome" placeholder="Nome"><br><br>
+  <input id="novoEmail" placeholder="Email"><br><br>
+
+  <select id="novoPerfil">
+    <option value="pagar">Contas a Pagar</option>
+    <option value="receber">Contas a Receber</option>
+    <option value="master">Master</option>
+  </select><br><br>
+
+  <button onclick="criarUsuario()">Criar Usuário</button>
+</div>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
@@ -129,6 +143,7 @@
 </div>
 
 <!-- APP -->
+<div id="boasVindas" style="margin-bottom:10px; font-weight:bold;"></div>
 <div id="app" style="display:none; padding:20px;">
 
 <button onclick="logout()" style="float:right;">Sair</button>
@@ -291,7 +306,7 @@ async function buscarPerfil() {
 
   const res = await fetch("/perfil", {
     headers: {
-      Authorization: "Bearer " + token
+      Authorization:  "Bearer " + localStorage.getItem("token") //"Bearer " + token
     }
   });
 
@@ -312,18 +327,18 @@ async function carregar() {
 
   let dados = await res.json();
 
-  // 🔥 FILTRO POR PERFIL
+  // 👇 MOSTRAR ADMIN
+  if (perfil === "master") {
+    document.getElementById("admin-panel").style.display = "block";
+  }
+
+  // 👇 FILTROS
   if (perfil === "pagar") {
     dados = dados.filter(item => item.tipo === "pagar");
   }
 
   if (perfil === "receber") {
     dados = dados.filter(item => item.tipo === "receber");
-  }
-
-  // master vê tudo (sem filtro)
-  if (perfil === "master") {
-    console.log("Modo diretoria ativo");
   }
 
   let totalPagar = 0;
@@ -353,7 +368,41 @@ async function carregar() {
 
   document.getElementById("pagar").innerText = totalPagar.toFixed(2);
   document.getElementById("receber").innerText = totalReceber.toFixed(2);
+  document.getElementById("saldo").innerText =
+    (totalReceber - totalPagar).toFixed(2);
+}
+
+// master vê tudo (sem filtro)
+
+  let totalPagar = 0;
+  let totalReceber = 0;
+
+  const tbody = document.getElementById("tabela");
+  tbody.innerHTML = "";
+
+  dados.forEach(item => {
+    const valor = Number(item.valor);
+
+    if (item.tipo === "pagar") totalPagar += valor;
+    else totalReceber += valor;
+
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${item.tipo}</td>
+      <td>${item.descricao}</td>
+      <td>R$ ${valor}</td>
+      <td>${item.data.split("-").reverse().join("/")}</td>
+      <td>${item.status}</td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("pagar").innerText = totalPagar.toFixed(2);
+  document.getElementById("receber").innerText = totalReceber.toFixed(2);
   document.getElementById("saldo").innerText = (totalReceber - totalPagar).toFixed(2);
+}
 
   new Chart(document.getElementById("grafico"), {
     type: "bar",
@@ -367,6 +416,27 @@ async function carregar() {
   });
 }
 
+//CRIAR USUÁRIO
+async function criarUsuario() {
+  const nome = document.getElementById("novoNome").value;
+  const email = document.getElementById("novoEmail").value;
+  const perfil = document.getElementById("novoPerfil").value;
+
+  const res = await fetch("/criar-usuario", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ nome, email, perfil })
+  });
+
+  const data = await res.json();
+
+  alert("Usuário criado!\nSenha temporária: " + data.senha);
+}
+
+carregar();
+mostrarUsuario();
 
 </script>
 

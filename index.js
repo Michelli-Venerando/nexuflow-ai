@@ -150,6 +150,54 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// CRIAR USUÁRIO
+app.post("/criar-usuario", async (req, res) => {
+  try {
+    const { nome, email, perfil } = req.body;
+
+    const senha = Math.random().toString(36).slice(-8);
+
+    const response = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/admin/users",
+      {
+        method: "POST",
+        headers: {
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password: senha,
+          email_confirm: true
+        })
+      }
+    );
+
+    await fetch(
+      process.env.SUPABASE_URL + "/rest/v1/usuarios",
+      {
+        method: "POST",
+        headers: {
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          perfil
+        })
+      }
+    );
+
+    res.json({ sucesso: true, senha });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erro ao criar usuário");
+  }
+});
+
 // 🚀 SERVIDOR
 const PORT = process.env.PORT || 3000;
 
@@ -197,3 +245,14 @@ app.get("/perfil", async (req, res) => {
     res.status(500).send("Erro ao buscar perfil");
   }
 });
+
+//Mostrar usuário
+async function mostrarUsuario() {
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (data.user) {
+    document.getElementById("boasVindas").innerText =
+      "Olá, " + data.user.email;
+  }
+}
+
