@@ -2,7 +2,7 @@
 <html>
 <head>
   <title>Painel Financeiro - Nexuflow</title>
-  <div id="admin-panel" style="display:none; margin-bottom:20px;">
+
   <h3>Gestão de Usuários</h3>
 
   <input id="novoNome" placeholder="Nome"><br><br>
@@ -114,7 +114,7 @@
 </head>
 
 <body>
-
+<div id="admin-panel" style="display:none; margin-bottom:20px;">
 <!-- LOGIN -->
 <div id="login-container">
   <div class="login-box">
@@ -218,6 +218,7 @@ async function verificarLogin() {
 
     document.getElementById("app").style.display = "block";
     carregar();
+	mostrarUsuaio();
   }
 }
 
@@ -245,6 +246,7 @@ async function login() {
   document.getElementById("app").style.display = "block";
 
   carregar();
+  mostrarUsuario();
 }
 
 window.login = login;
@@ -372,38 +374,13 @@ async function carregar() {
     (totalReceber - totalPagar).toFixed(2);
 }
 
-// master vê tudo (sem filtro)
-
-  let totalPagar = 0;
-  let totalReceber = 0;
-
-  const tbody = document.getElementById("tabela");
-  tbody.innerHTML = "";
-
-  dados.forEach(item => {
-    const valor = Number(item.valor);
-
-    if (item.tipo === "pagar") totalPagar += valor;
-    else totalReceber += valor;
-
-    const tr = document.createElement("tr");
-
-    tr.innerHTML = `
-      <td>${item.tipo}</td>
-      <td>${item.descricao}</td>
-      <td>R$ ${valor}</td>
-      <td>${item.data.split("-").reverse().join("/")}</td>
-      <td>${item.status}</td>
-    `;
-
-    tbody.appendChild(tr);
-  });
 
   document.getElementById("pagar").innerText = totalPagar.toFixed(2);
   document.getElementById("receber").innerText = totalReceber.toFixed(2);
   document.getElementById("saldo").innerText = (totalReceber - totalPagar).toFixed(2);
 }
 
+//Gráfico
   new Chart(document.getElementById("grafico"), {
     type: "bar",
     data: {
@@ -435,8 +412,8 @@ async function criarUsuario() {
   alert("Usuário criado!\nSenha temporária: " + data.senha);
 }
 
-carregar();
-mostrarUsuario();
+
+
 
 </script>
 
