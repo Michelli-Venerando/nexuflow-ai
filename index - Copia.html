@@ -3,7 +3,20 @@
 <head>
   <title>Painel Financeiro - Nexuflow</title>
 
+
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <input id="novoNome" placeholder="Nome"><br><br>
+  <input id="novoEmail" placeholder="Email"><br><br>
+
+  <select id="novoPerfil">
+    <option value="pagar">Contas a Pagar</option>
+    <option value="receber">Contas a Receber</option>
+    <option value="master">Master</option>
+  </select><br><br>
+
+  <button onclick="criarUsuario()">Criar Usuário</button>
 
   <style>
     body {
@@ -12,6 +25,7 @@
       background: #f5f5f5;
     }
 
+    /* FUNDO LOGIN E RESET */
     #login-container, #reset-container {
       height: 100vh;
       background: url("/Imagens/plano-fundo.png") no-repeat center center;
@@ -29,6 +43,7 @@
       background: rgba(0,0,0,0.5);
     }
 
+    /* BOX */
     .login-box {
       position: relative;
       z-index: 1;
@@ -65,6 +80,7 @@
       margin-bottom: 10px;
     }
 
+    /* APP */
     h1 { text-align: center; }
 
     .cards {
@@ -98,7 +114,7 @@
 </head>
 
 <body>
-
+<!--<div id="admin-panel" style="display:none; margin-bottom:20px;"> -->
 <!-- LOGIN -->
 <div id="login-container">
   <div class="login-box">
@@ -113,19 +129,21 @@
   </div>
 </div>
 
-<!-- RESET -->
+<!-- RESET SENHA -->
 <div id="reset-container" style="display:none;">
   <div class="login-box">
     <h2>Nova Senha</h2>
+
     <input id="novaSenha" type="password" placeholder="Digite a nova senha">
+
     <p id="erroSenha" class="erro"></p>
-    <button onclick="alterarSenha()">Salvar</button>
+
+    <button onclick="alterarSenha()">Salvar nova senha</button>
   </div>
 </div>
 
 <!-- APP -->
-<div id="boasVindas" style="margin:10px; font-weight:bold;"></div>
-
+<div id="boasVindas" style="margin-bottom:10px; font-weight:bold;"></div>
 <div id="app" style="display:none; padding:20px;">
 
   <button onclick="logout()" style="float:right;">Sair</button>
@@ -189,63 +207,144 @@ const { createClient } = supabase;
 
 const supabaseClient = createClient(
   "https://zwwdeetzpwrbtiyvfsjj.supabase.co",
-  "SUA_CHAVE_AQUI"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
 );
 
-let grafico;
-
-// LOGIN CHECK
+// 🔐 VERIFICAR LOGIN / RESET
 async function verificarLogin() {
+
+  const hash = window.location.hash;
+
+  if (hash && hash.includes("access_token")) {
+    const params = new URLSearchParams(hash.replace("#", ""));
+
+    const access_token = params.get("access_token");
+    const refresh_token = params.get("refresh_token");
+
+    if (access_token && refresh_token) {
+      await supabaseClient.auth.setSession({
+        access_token,
+        refresh_token
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
   const { data } = await supabaseClient.auth.getSession();
 
   if (data.session) {
     localStorage.setItem("token", data.session.access_token);
+
     document.getElementById("login-container").style.display = "none";
+
+    if (hash.includes("type=recovery")) {
+      document.getElementById("reset-container").style.display = "flex";
+      return;
+    }
+
     document.getElementById("app").style.display = "block";
     carregar();
-    mostrarUsuario();
+	mostrarUsuario();
   }
 }
 
 // LOGIN
 async function login() {
-  const email = emailInput.value;
-  const senha = senhaInput.value;
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  const erro = document.getElementById("erroLogin");
+
+  erro.innerText = "";
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email, password: senha
+    email,
+    password: senha
   });
 
-  if (error) return alert("Erro login");
+  if (error) {
+    erro.innerText = "Email ou senha inválidos";
+    return;
+  }
 
   localStorage.setItem("token", data.session.access_token);
 
-  loginContainer.style.display = "none";
-  app.style.display = "block";
+  document.getElementById("login-container").style.display = "none";
+  document.getElementById("app").style.display = "block";
 
   carregar();
   mostrarUsuario();
 }
 
+window.login = login;
+
 // LOGOUT
 async function logout() {
   await supabaseClient.auth.signOut();
-  location.reload();
+
+  localStorage.removeItem("token");
+
+  document.getElementById("login-container").style.display = "flex";
+  document.getElementById("app").style.display = "none";
 }
 
-// PERFIL
+window.logout = logout;
+
+// ALTERAR SENHA
+async function alterarSenha() {
+  const novaSenha = document.getElementById("novaSenha").value;
+  const erroMsg = document.getElementById("erroSenha");
+
+  erroMsg.innerText = "";
+
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (!data.session) {
+    erroMsg.innerText = "Sessão inválida. Gere um novo link.";
+    return;
+  }
+
+  const { error } = await supabaseClient.auth.updateUser({
+    password: novaSenha
+  });
+
+  if (error) {
+    if (error.message.includes("different from the old password")) {
+      erroMsg.innerText = "A nova senha deve ser diferente da anterior.";
+    } else if (error.message.includes("Password should be at least")) {
+      erroMsg.innerText = "A senha deve ter pelo menos 6 caracteres.";
+    } else {
+      erroMsg.innerText = "Erro ao alterar senha.";
+    }
+    return;
+  }
+
+  alert("Senha alterada com sucesso!");
+
+  document.getElementById("reset-container").style.display = "none";
+  document.getElementById("app").style.display = "block";
+
+  carregar();
+}
+
+window.alterarSenha = alterarSenha;
+
+//BUSCAR PERFIL
 async function buscarPerfil() {
+  const token = localStorage.getItem("token");
+
   const res = await fetch("/perfil", {
     headers: {
-      Authorization: "Bearer " + localStorage.getItem("token")
+      Authorization:  "Bearer " + localStorage.getItem("token") //"Bearer " + token
     }
   });
 
   const data = await res.json();
-  return data.perfil;
+
+  return data.perfil; // pagar | receber | master
 }
 
-// CARREGAR
+// CARREGAR DADOS
 async function carregar() {
   const perfil = await buscarPerfil();
 
@@ -257,89 +356,106 @@ async function carregar() {
 
   let dados = await res.json();
 
+  // 👇 MOSTRAR ADMIN
   if (perfil === "master") {
-    menuAdmin.style.display = "inline-block";
+    document.getElementById("menu-admin").style.display = "inline-block";
   }
 
+  // 👇 FILTROS
   if (perfil === "pagar") {
-    dados = dados.filter(i => i.tipo === "pagar");
+    dados = dados.filter(item => item.tipo === "pagar");
   }
 
   if (perfil === "receber") {
-    dados = dados.filter(i => i.tipo === "receber");
+    dados = dados.filter(item => item.tipo === "receber");
   }
 
-  let pagar = 0, receber = 0;
-  tabela.innerHTML = "";
+  let totalPagar = 0;
+  let totalReceber = 0;
 
-  dados.forEach(i => {
-    const v = Number(i.valor);
+  const tbody = document.getElementById("tabela");
+  tbody.innerHTML = "";
 
-    i.tipo === "pagar" ? pagar += v : receber += v;
+  dados.forEach(item => {
+    const valor = Number(item.valor);
 
-    tabela.innerHTML += `
-      <tr>
-        <td>${i.tipo}</td>
-        <td>${i.descricao}</td>
-        <td>R$ ${v}</td>
-        <td>${i.data.split("-").reverse().join("/")}</td>
-        <td>${i.status}</td>
-      </tr>
+    if (item.tipo === "pagar") totalPagar += valor;
+    else totalReceber += valor;
+
+    const tr = document.createElement("tr");
+
+    tr.innerHTML = `
+      <td>${item.tipo}</td>
+      <td>${item.descricao}</td>
+      <td>R$ ${valor}</td>
+      <td>${item.data.split("-").reverse().join("/")}</td>
+      <td>${item.status}</td>
     `;
+
+    tbody.appendChild(tr);
   });
 
-  document.getElementById("pagar").innerText = pagar.toFixed(2);
-  document.getElementById("receber").innerText = receber.toFixed(2);
-  document.getElementById("saldo").innerText = (receber - pagar).toFixed(2);
+  document.getElementById("pagar").innerText = totalPagar.toFixed(2);
+  document.getElementById("receber").innerText = totalReceber.toFixed(2);
+  document.getElementById("saldo").innerText =
+    (totalReceber - totalPagar).toFixed(2);
 
-  if (grafico) grafico.destroy();
 
-  grafico = new Chart(document.getElementById("grafico"), {
+//Gráfico
+  new Chart(document.getElementById("grafico"), {
     type: "bar",
     data: {
       labels: ["A Pagar", "A Receber"],
       datasets: [{
         label: "Valores",
-        data: [pagar, receber]
+        data: [totalPagar, totalReceber]
       }]
     }
   });
 }
 
-// CRIAR USUÁRIO
+//CRIAR USUÁRIO
 async function criarUsuario() {
-  const nome = novoNome.value;
-  const email = novoEmail.value;
-  const perfil = novoPerfil.value;
+  const nome = document.getElementById("novoNome").value;
+  const email = document.getElementById("novoEmail").value;
+  const perfil = document.getElementById("novoPerfil").value;
 
   const res = await fetch("/criar-usuario", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({ nome, email, perfil })
   });
 
   const data = await res.json();
-  alert("Senha: " + data.senha);
+
+  alert("Usuário criado!\nSenha temporária: " + data.senha);
 }
 
-// NAVEGAÇÃO
+//Navegação entre as telas
 function abrirPainel(tela) {
-  telaDashboard.style.display = "none";
-  adminPanel.style.display = "none";
+  document.getElementById("tela-dashboard").style.display = "none";
+  document.getElementById("admin-panel").style.display = "none";
 
-  if (tela === "dashboard") telaDashboard.style.display = "block";
-  if (tela === "usuarios") adminPanel.style.display = "block";
+  if (tela === "dashboard") {
+    document.getElementById("tela-dashboard").style.display = "block";
+  }
+
+  if (tela === "usuarios") {
+    document.getElementById("admin-panel").style.display = "block";
+  }
 }
 
-// USUÁRIO
+//Mostrar usuário
 async function mostrarUsuario() {
   const { data } = await supabaseClient.auth.getUser();
 
   if (data.user) {
-    boasVindas.innerText = "Olá, " + data.user.email;
+    document.getElementById("boasVindas").innerText =
+      "Olá, " + data.user.email;
   }
 }
-
 verificarLogin();
 
 </script>
