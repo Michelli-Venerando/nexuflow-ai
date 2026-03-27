@@ -246,13 +246,5 @@ app.get("/perfil", async (req, res) => {
   }
 });
 
-//Mostrar usuário
-async function mostrarUsuario() {
-  const { data } = await supabaseClient.auth.getUser();
 
-  if (data.user) {
-    document.getElementById("boasVindas").innerText =
-      "Olá, " + data.user.email;
-  }
-}
 

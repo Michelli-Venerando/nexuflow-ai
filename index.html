@@ -3,7 +3,9 @@
 <head>
   <title>Painel Financeiro - Nexuflow</title>
 
-  <h3>Gestão de Usuários</h3>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <input id="novoNome" placeholder="Nome"><br><br>
   <input id="novoEmail" placeholder="Email"><br><br>
@@ -15,8 +17,6 @@
   </select><br><br>
 
   <button onclick="criarUsuario()">Criar Usuário</button>
-</div>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
@@ -245,7 +245,7 @@ async function verificarLogin() {
 
     document.getElementById("app").style.display = "block";
     carregar();
-	mostrarUsuaio();
+	mostrarUsuario();
   }
 }
 
@@ -399,13 +399,7 @@ async function carregar() {
   document.getElementById("receber").innerText = totalReceber.toFixed(2);
   document.getElementById("saldo").innerText =
     (totalReceber - totalPagar).toFixed(2);
-}
 
-
-  document.getElementById("pagar").innerText = totalPagar.toFixed(2);
-  document.getElementById("receber").innerText = totalReceber.toFixed(2);
-  document.getElementById("saldo").innerText = (totalReceber - totalPagar).toFixed(2);
-}
 
 //Gráfico
   new Chart(document.getElementById("grafico"), {
@@ -453,6 +447,16 @@ function abrirPainel(tela) {
   }
 }
 
+//Mostrar usuário
+async function mostrarUsuario() {
+  const { data } = await supabaseClient.auth.getUser();
+
+  if (data.user) {
+    document.getElementById("boasVindas").innerText =
+      "Olá, " + data.user.email;
+  }
+}
+verificarLogin();
 
 </script>
 
