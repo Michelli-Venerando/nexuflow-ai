@@ -189,7 +189,7 @@ const { createClient } = supabase;
 
 const supabaseClient = createClient(
   "https://zwwdeetzpwrbtiyvfsjj.supabase.co",
-  "SUA_CHAVE_AQUI"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
 );
 
 let grafico;
@@ -209,19 +209,23 @@ async function verificarLogin() {
 
 // LOGIN
 async function login() {
-  const email = emailInput.value;
-  const senha = senhaInput.value;
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email, password: senha
+    email,
+    password: senha
   });
 
-  if (error) return alert("Erro login");
+  if (error) {
+    document.getElementById("erroLogin").innerText = "Email ou senha inválidos";
+    return;
+  }
 
   localStorage.setItem("token", data.session.access_token);
 
-  loginContainer.style.display = "none";
-  app.style.display = "block";
+  document.getElementById("login-container").style.display = "none";
+  document.getElementById("app").style.display = "block";
 
   carregar();
   mostrarUsuario();
