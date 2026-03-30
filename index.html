@@ -338,9 +338,13 @@ function abrirPainel(tela) {
 // USUÁRIO
 async function mostrarUsuario() {
   const { data } = await supabaseClient.auth.getUser();
+  const perfilData = await buscarPerfil();
 
   if (data.user) {
-    boasVindas.innerText = "Olá, " + data.user.email;
+    boasVindas.innerText =
+      (perfilData.empresa_nome || "Empresa") +
+      " - " +
+      data.user.nome;
   }
 }
 
