@@ -1,294 +1,189 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-  <title>Painel Financeiro - Nexuflow</title>
+  <meta charset="UTF-8">
+  <title>Nexuflow</title>
 
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
     body {
-      font-family: Arial;
       margin: 0;
-      background: #f5f5f5;
-    }
-
-    #login-container {
-      height: 100vh;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: white;
       display: flex;
       justify-content: center;
       align-items: center;
-      background: #222;
+      height: 100vh;
     }
 
-    .login-box {
-      background: white;
+    .container {
+      background: #111827;
       padding: 30px;
-      border-radius: 10px;
+      border-radius: 12px;
       width: 300px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
       text-align: center;
     }
 
-    input, button {
+    input {
       width: 100%;
       padding: 10px;
-      margin-bottom: 10px;
+      margin-top: 10px;
+      border: none;
+      border-radius: 6px;
     }
 
-    #app {
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 15px;
+      border: none;
+      border-radius: 6px;
+      background: #22c55e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    #dashboard {
       display: none;
-      padding: 20px;
-    }
-
-    .cards {
-      display: flex;
-      gap: 20px;
-    }
-
-    .card {
-      flex: 1;
-      padding: 20px;
-      background: white;
-      border-radius: 10px;
-      text-align: center;
-    }
-
-    table {
-      width: 100%;
-      background: white;
-      margin-top: 20px;
-      border-collapse: collapse;
-    }
-
-    td, th {
-      padding: 10px;
-      border-bottom: 1px solid #ddd;
     }
   </style>
 </head>
-
 <body>
 
-<!-- LOGIN -->
-<div id="login-container">
-  <div class="login-box">
-    <h2>Nexuflow</h2>
+<div class="container" id="login">
+  <h2>Login Nexuflow</h2>
 
-    <input id="email" placeholder="Email">
-    <input id="senha" type="password" placeholder="Senha">
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="senha" placeholder="Senha">
 
-    <p id="erroLogin" style="color:red;"></p>
+  <button onclick="login()">Entrar</button>
 
-    <button onclick="login()">Entrar</button>
-  </div>
+  <p id="erro" style="color:red;"></p>
 </div>
 
-<!-- APP -->
-<div id="app">
+<div class="container" id="dashboard">
+  <h2>Dashboard</h2>
 
-  <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-    <div><b id="usuario"></b></div>
-    <button onclick="logout()">Sair</button>
-  </div>
+  <p id="nome"></p>
+  <p id="empresa"></p>
 
-  <h1>💰 Painel Financeiro</h1>
+  <button onclick="carregarTransacoes()">Ver Transações</button>
 
-  <div>
-    <button onclick="abrirPainel('dashboard')">Dashboard</button>
-    <button id="menu-admin" onclick="abrirPainel('usuarios')" style="display:none;">
-      Gestão de Usuários
-    </button>
-  </div>
+  <ul id="lista"></ul>
 
-  <!-- DASHBOARD -->
-  <div id="dashboard">
-    <div class="cards">
-      <div class="card">A Pagar: R$ <span id="pagar">0</span></div>
-      <div class="card">A Receber: R$ <span id="receber">0</span></div>
-      <div class="card">Saldo: R$ <span id="saldo">0</span></div>
-    </div>
-
-    <canvas id="grafico"></canvas>
-
-    <table>
-      <thead>
-        <tr>
-          <th>Tipo</th>
-          <th>Descrição</th>
-          <th>Valor</th>
-          <th>Data</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody id="tabela"></tbody>
-    </table>
-  </div>
-
-  <!-- USUÁRIOS -->
-  <div id="usuarios" style="display:none;">
-    <h3>Gestão de Usuários</h3>
-
-    <input id="novoNome" placeholder="Nome">
-    <input id="novoEmail" placeholder="Email">
-
-    <select id="novoPerfil">
-      <option value="pagar">Contas a Pagar</option>
-      <option value="receber">Contas a Receber</option>
-      <option value="master">Master</option>
-    </select>
-
-    <button onclick="criarUsuario()">Criar Usuário</button>
-  </div>
-
+  <button onclick="logout()" style="background:#ef4444;">Sair</button>
 </div>
 
 <script>
-const { createClient } = supabase;
+  const SUPABASE_URL = "https://zwwdeetzpwrbtiyvfsjj.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk";
 
-const supabaseClient = createClient(
-  "https://zwwdeetzpwrbtiyvfsjj.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3d2RlZXR6cHdyYnRpeXZmc2pqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyODY4MTksImV4cCI6MjA4OTg2MjgxOX0.OKuhe5_umIl6R-F41FjWr_NctpO6T8qZ7KAhHVuGBZk"
-);
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-let grafico;
+  // 🔐 LOGIN
+  async function login() {
+    const email = document.getElementById("email").value;
+    const senha = document.getElementById("senha").value;
 
-// LOGIN AUTO
-async function verificarLogin() {
-  const { data } = await supabaseClient.auth.getSession();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: senha
+    });
 
-  if (data.session) {
-    localStorage.setItem("token", data.session.access_token);
-    iniciarSistema();
-  }
-}
+    if (error) {
+      document.getElementById("erro").innerText = "Login inválido";
+      return;
+    }
 
-// LOGIN
-async function login() {
-  const email = emailInput.value;
-  const senha = senhaInput.value;
+    const token = data.session.access_token;
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
-    password: senha
-  });
+    // 🔥 SALVA TOKEN
+    localStorage.setItem("token", token);
 
-  if (error) {
-    erroLogin.innerText = "Email ou senha inválidos";
-    return;
+    carregarPerfil(token);
   }
 
-  localStorage.setItem("token", data.session.access_token);
-  iniciarSistema();
-}
+  // 👤 PERFIL
+  async function carregarPerfil(token) {
+    try {
+      const response = await fetch("/perfil", {
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      });
 
-// INICIAR
-function iniciarSistema() {
-  login-container.style.display = "none";
-  app.style.display = "block";
+      const data = await response.json();
 
-  carregarPerfil();
-  carregarDados();
-}
+      if (!data) {
+        document.getElementById("erro").innerText = "Erro ao carregar perfil";
+        return;
+      }
 
-// PERFIL
-async function carregarPerfil() {
-  const res = await fetch("/perfil", {
-    headers: {
-      Authorization: "Bearer " + localStorage.getItem("token")
+      document.getElementById("login").style.display = "none";
+      document.getElementById("dashboard").style.display = "block";
+
+      // 🔥 FORMATA COMO VOCÊ QUERIA
+      const nomeFinal =
+        (data.perfil || "perfil") + " - " +
+        (data.empresa || "Empresa") + " - " +
+        (data.nome || data.email);
+
+      document.getElementById("nome").innerText = nomeFinal;
+      document.getElementById("empresa").innerText = "";
+
+      window.TOKEN = token;
+
+    } catch (erro) {
+      console.error(erro);
+      document.getElementById("erro").innerText = "Erro no servidor";
     }
-  });
-
-  const data = await res.json();
-
-  usuario.innerText =
-    (data.empresa || "Empresa") +
-    " - " +
-    (data.nome || data.email);
-
-  if (data.perfil === "master") {
-    menu-admin.style.display = "inline-block";
   }
-}
 
-// DADOS
-async function carregarDados() {
-  const res = await fetch("/transacoes", {
-    headers: {
-      Authorization: "Bearer " + localStorage.getItem("token")
+  // 💰 TRANSAÇÕES
+  async function carregarTransacoes() {
+    try {
+      const response = await fetch("/transacoes", {
+        headers: {
+          Authorization: "Bearer " + window.TOKEN
+        }
+      });
+
+      const data = await response.json();
+
+      const lista = document.getElementById("lista");
+      lista.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        lista.innerHTML = "<li>Sem dados</li>";
+        return;
+      }
+
+      data.forEach(t => {
+        const li = document.createElement("li");
+        li.innerText = `${t.descricao} - R$ ${t.valor}`;
+        lista.appendChild(li);
+      });
+
+    } catch (erro) {
+      console.error(erro);
+      alert("Erro ao carregar transações");
     }
-  });
+  }
 
-  const dados = await res.json();
+  // 🚪 LOGOUT
+  function logout() {
+    localStorage.removeItem("token");
+    location.reload();
+  }
 
-  let pagar = 0, receber = 0;
-  tabela.innerHTML = "";
-
-  dados.forEach(i => {
-    const v = Number(i.valor);
-
-    if (i.tipo === "pagar") pagar += v;
-    else receber += v;
-
-    tabela.innerHTML += `
-      <tr>
-        <td>${i.tipo}</td>
-        <td>${i.descricao}</td>
-        <td>${v}</td>
-        <td>${i.data}</td>
-        <td>${i.status}</td>
-      </tr>
-    `;
-  });
-
-  pagarEl.innerText = pagar.toFixed(2);
-  receberEl.innerText = receber.toFixed(2);
-  saldo.innerText = (receber - pagar).toFixed(2);
-
-  if (grafico) grafico.destroy();
-
-  grafico = new Chart(graficoCanvas, {
-    type: "bar",
-    data: {
-      labels: ["Pagar", "Receber"],
-      datasets: [{
-        data: [pagar, receber]
-      }]
-    }
-  });
-}
-
-// USUÁRIO
-async function criarUsuario() {
-  const res = await fetch("/criar-usuario", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({
-      nome: novoNome.value,
-      email: novoEmail.value,
-      perfil: novoPerfil.value
-    })
-  });
-
-  const data = await res.json();
-  alert("Senha: " + data.senha);
-}
-
-// NAV
-function abrirPainel(tela) {
-  dashboard.style.display = "none";
-  usuarios.style.display = "none";
-
-  if (tela === "dashboard") dashboard.style.display = "block";
-  if (tela === "usuarios") usuarios.style.display = "block";
-}
-
-// LOGOUT
-async function logout() {
-  await supabaseClient.auth.signOut();
-  location.reload();
-}
-
-verificarLogin();
+  // 🔄 AUTO LOGIN
+  if (localStorage.getItem("token")) {
+    carregarPerfil(localStorage.getItem("token"));
+  }
 </script>
 
 </body>
