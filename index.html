@@ -245,13 +245,13 @@ async function buscarPerfil() {
     }
   });
 
-  const data = await res.json();
-  return data.perfil;
+	const data = await res.json();
+	return data;
 }
 
 // CARREGAR
 async function carregar() {
-  const perfil = await buscarPerfil();
+  const { perfil, empresa_id } = await buscarPerfil();
 
   const res = await fetch("/transacoes", {
     headers: {
@@ -262,7 +262,7 @@ async function carregar() {
   let dados = await res.json();
 
   if (perfil === "master") {
-    menuAdmin.style.display = "inline-block";
+    document.getElementById("menu-admin").style.display = "inline-block";
   }
 
   if (perfil === "pagar") {

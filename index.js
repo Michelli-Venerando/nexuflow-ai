@@ -54,7 +54,7 @@ app.get("/transacoes", async (req, res) => {
     // 🔥 busca só dados do usuário
     const response = await fetch(
       process.env.SUPABASE_URL +
-        "/rest/v1/transacoes?select=*&cliente_id=eq." + userData.id,
+        "/rest/v1/transacoes?empresa_id=eq." + empresa_id
       {
         headers: {
           "apikey": process.env.SUPABASE_KEY,
@@ -222,29 +222,36 @@ app.get("/perfil", async (req, res) => {
 
     const userData = await userResponse.json();
 
-    // 🔥 buscar perfil na tabela usuarios
-    const perfilResponse = await fetch(
-      process.env.SUPABASE_URL +
-        "/rest/v1/usuarios?email=eq." + encodeURIComponent(userData.email),
-      {
-        headers: {
-          "apikey": process.env.SUPABASE_KEY,
-          "Authorization": "Bearer " + process.env.SUPABASE_KEY
-        }
-      }
-    );
-
-    const perfilData = await perfilResponse.json();
-
-    res.json({
-      perfil: perfilData[0]?.perfil || "master"
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Erro ao buscar perfil");
+// 🔥 pega empresa do usuário
+const perfilResponse = await fetch(
+  process.env.SUPABASE_URL +
+    "/rest/v1/usuarios?email=eq." + encodeURIComponent(userData.email),
+  {
+    headers: {
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY
+    }
   }
-});
+);
+
+const perfilData = await perfilResponse.json();
+const empresa_id = perfilData[0]?.empresa_id;
+
+// 🔥 busca transações da empresa
+const response = await fetch(
+  process.env.SUPABASE_URL +
+    "/rest/v1/transacoes?select=*&empresa_id=eq." + empresa_id,
+  {
+    headers: {
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY
+    }
+  }
+);
+
+const data = await response.json();
+
+res.json(data);
 
 
 
