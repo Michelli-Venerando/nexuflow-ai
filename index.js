@@ -205,7 +205,7 @@ app.listen(PORT, () => {
   console.log("Servidor rodando na porta " + PORT);
 });
 
-//CARREGAR PERFIL
+/*//CARREGAR PERFIL
 app.get("/perfil", async (req, res) => {
   try {
     const token = req.headers.authorization;
@@ -221,7 +221,7 @@ app.get("/perfil", async (req, res) => {
     );
 
     const userData = await userResponse.json();
-	
+*/	
 app.get("/perfil", async (req, res) => {
   try {
     const token = req.headers.authorization;
