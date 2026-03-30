@@ -43,15 +43,15 @@ app.get("/perfil", async (req, res) => {
     );
 
     const perfilData = await perfilResponse.json();
-    const usuario = perfilData[0];
+    const usuario = perfilData[0] || {};
 
-    res.json({
-      nome: usuario?.nome,
-      email: usuario?.email,
-      perfil: usuario?.perfil,
-      empresa: usuario?.empresas?.nome || "Empresa",
-      empresa_id: usuario?.empresa_id
-    });
+res.json({
+  nome: usuario.nome || userData.email,
+  email: usuario.email || userData.email,
+  perfil: usuario.perfil || "master",
+  empresa: usuario.empresas?.nome || "Empresa",
+  empresa_id: usuario.empresa_id || null
+});
 
   } catch (erro) {
     console.error(erro);
