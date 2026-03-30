@@ -222,6 +222,22 @@ app.get("/perfil", async (req, res) => {
 
     const userData = await userResponse.json();
 */	
+
+// 🔥 pega empresa do usuário
+    const perfilResponse = await fetch(
+      process.env.SUPABASE_URL +
+        "/rest/v1/usuarios?email=eq." + encodeURIComponent(userData.email),
+      {
+        headers: {
+          "apikey": process.env.SUPABASE_KEY,
+          "Authorization": "Bearer " + process.env.SUPABASE_KEY
+        }
+      }
+    );
+
+    const perfilData = await perfilResponse.json();
+    const usuario = perfilData[0];
+
 app.get("/perfil", async (req, res) => {
   try {
     const token = req.headers.authorization;
@@ -251,8 +267,7 @@ app.get("/perfil", async (req, res) => {
       }
     );
 
-    const perfilData = await perfilResponse.json();
-    const usuario = perfilData[0];
+
 
     // 🔥 busca empresa
     let empresa_nome = "Empresa";
@@ -273,7 +288,7 @@ app.get("/perfil", async (req, res) => {
       empresa_nome = empresaData[0]?.nome || "Empresa";
     }
 
-    // ✅ resposta correta
+ /*// ✅ resposta correta
     res.json({
       perfil: usuario?.perfil || "master",
       empresa_id: usuario?.empresa_id,
@@ -286,7 +301,32 @@ app.get("/perfil", async (req, res) => {
     res.status(500).send("Erro ao buscar perfil");
   }
 });
+*/
 
+// pega usuário
+const usuario = perfilData[0];
+
+// 🔥 busca empresa
+const empresaResponse = await fetch(
+  process.env.SUPABASE_URL +
+    "/rest/v1/empresas?id=eq." + usuario.empresa_id,
+  {
+    headers: {
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY
+    }
+  }
+);
+
+const empresaData = await empresaResponse.json();
+const empresa = empresaData[0];
+
+res.json({
+  nome: usuario.nome,
+  email: usuario.email,
+  perfil: usuario.perfil,
+  empresa: empresa?.nome || "Empresa"
+});
 //TRANSAÇÕES
 app.get("/transacoes", async (req, res) => {
   try {
@@ -308,18 +348,33 @@ app.get("/transacoes", async (req, res) => {
     );
 
     const userData = await userResponse.json();
+	
+// 🔥 pega usuário
+const perfilResponse = await fetch(
+  process.env.SUPABASE_URL +
+    "/rest/v1/usuarios?email=eq." + encodeURIComponent(userData.email),
+  {
+    headers: {
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY
+    }
+  }
+);
 
-// 🔥 pega empresa do usuário
-    const perfilResponse = await fetch(
-      process.env.SUPABASE_URL +
-        "/rest/v1/usuarios?email=eq." + encodeURIComponent(userData.email),
-      {
-        headers: {
-          "apikey": process.env.SUPABASE_KEY,
-          "Authorization": "Bearer " + process.env.SUPABASE_KEY
-        }
-      }
-    );
+const perfilData = await perfilResponse.json();
+const empresa_id = perfilData[0]?.empresa_id;
+
+// 🔥 agora sim busca transações
+const response = await fetch(
+  process.env.SUPABASE_URL +
+    "/rest/v1/transacoes?empresa_id=eq." + empresa_id,
+  {
+    headers: {
+      "apikey": process.env.SUPABASE_KEY,
+      "Authorization": "Bearer " + process.env.SUPABASE_KEY
+    }
+  }
+);
 
     const perfilData = await perfilResponse.json();
     const empresa_id = perfilData[0]?.empresa_id;

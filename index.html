@@ -124,7 +124,9 @@
 </div>
 
 <!-- APP -->
-<div id="boasVindas" style="margin:10px; font-weight:bold;"></div>
+<div id="boasVindas" style="margin:10px; font-weight:bold;">
+  <span id="usuario"></span>
+</div>
 
 <div id="app" style="display:none; padding:20px;">
 
@@ -251,7 +253,10 @@ async function buscarPerfil() {
 
 // CARREGAR
 async function carregar() {
-  const { perfil, empresa_id } = await buscarPerfil();
+  const { nome, email, perfil, empresa } = await buscarPerfil();
+  
+  document.getElementById("usuario").innerText =
+  `${perfil} - ${empresa} - ${nome || email}`;
 
   const res = await fetch("/transacoes", {
     headers: {
