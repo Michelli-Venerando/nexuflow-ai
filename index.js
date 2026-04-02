@@ -407,11 +407,9 @@ app.post("/transacoes", async (req, res) => {
 
     const tipo = String(req.body.tipo || "").toLowerCase();
     const descricao = String(req.body.descricao || "").trim();
-    const valor = Number(req.body.valor);
-    const dados =
-      req.body.dados ||
-      new Date().toISOString().slice(0, 10);
-    const status = String(req.body.status || "ativo");
+    const valor = parseValorEntrada(req.body.valor);
+    const dados = normalizarDataParaISO(req.body.dados);
+    const status = String(req.body.status || "banda").trim() || "banda";
 
     if (!["pagar", "receber"].includes(tipo)) {
       return res.status(400).json({ error: "Tipo deve ser pagar ou receber." });
@@ -423,43 +421,55 @@ app.post("/transacoes", async (req, res) => {
       return res.status(400).json({ error: "Valor inválido." });
     }
 
-    const payload = {
-      tipo,
-      dados,
-      status
-    };
-    payload["descrição"] = descricao;
-    payload.valentia = valor;
-    if (empresa_id) payload.empresa_id = empresa_id;
-
-    let ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
-      method: "POST",
-      headers: headersUser,
-      body: JSON.stringify(payload)
-    });
-    let body = await jsonOuErro(ins);
-
-    if (!ins.ok && headersSvcPost) {
-      ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
-        method: "POST",
-        headers: headersSvcPost,
-        body: JSON.stringify(payload)
-      });
-      body = await jsonOuErro(ins);
+    function montarPayloadPT() {
+      const p = { tipo, dados, status };
+      p["descrição"] = descricao;
+      p.valentia = valor;
+      if (empresa_id) p.empresa_id = empresa_id;
+      return p;
     }
 
-    if (!ins.ok) {
-      const alt = { ...payload };
-      delete alt["descrição"];
-      alt.descricao = descricao;
-      delete alt.valentia;
-      alt.valor = valor;
-      ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
+    function montarPayloadEN() {
+      const p = { tipo, dados, status, descricao, valor };
+      if (empresa_id) p.empresa_id = empresa_id;
+      return p;
+    }
+
+    async function tentarInsert(headers, payloadJson) {
+      const ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
         method: "POST",
-        headers: headersSvcPost || headersUser,
-        body: JSON.stringify(alt)
+        headers,
+        body: JSON.stringify(payloadJson)
       });
-      body = await jsonOuErro(ins);
+      const body = await jsonOuErro(ins);
+      return { ins, body };
+    }
+
+    const tentativasPayload = [
+      montarPayloadPT(),
+      { ...montarPayloadPT(), status: "ativo" },
+      (() => {
+        const x = montarPayloadPT();
+        delete x.status;
+        return x;
+      })(),
+      montarPayloadEN()
+    ];
+
+    const ordemHeaders = headersSvcPost
+      ? [headersSvcPost, headersUser]
+      : [headersUser];
+
+    let ins = { ok: false };
+    let body = null;
+
+    outer: for (const h of ordemHeaders) {
+      for (const pl of tentativasPayload) {
+        const r = await tentarInsert(h, pl);
+        ins = r.ins;
+        body = r.body;
+        if (ins.ok) break outer;
+      }
     }
 
     if (!ins.ok) {
@@ -551,10 +561,11 @@ app.post("/usuarios", async (req, res) => {
       .toLowerCase()
       .trim() || "operador";
 
-    if (!email || !password || password.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "E-mail e senha (mín. 6 caracteres) são obrigatórios." });
+    if (!email || !password || password.length < 8) {
+      return res.status(400).json({
+        error:
+          "E-mail e senha são obrigatórios. Use senha com pelo menos 8 caracteres (regra comum no Supabase)."
+      });
     }
     if (!nome) {
       return res.status(400).json({ error: "Informe o nome do usuário." });
@@ -571,23 +582,49 @@ app.post("/usuarios", async (req, res) => {
         body: JSON.stringify({
           email,
           password,
-          email_confirm: true
+          email_confirm: true,
+          user_metadata: { nome }
         })
       }
     );
-    const created = await jsonOuErro(adminRes);
+    let created = await jsonOuErro(adminRes);
     if (!adminRes.ok) {
       const msg =
         created?.msg ||
         created?.message ||
         created?.error_description ||
+        created?.error ||
         "Falha ao criar usuário no Auth";
       return res.status(400).json({ error: msg });
     }
 
-    const newId = created.id || created.user?.id;
+    if (Array.isArray(created)) {
+      created = created[0];
+    }
+
+    let newId = created?.id || created?.user?.id || created?.users?.[0]?.id;
     if (!newId) {
       return res.status(502).json({ error: "Resposta inesperada ao criar usuário." });
+    }
+
+    const confirmRes = await fetch(
+      `${process.env.SUPABASE_URL}/auth/v1/admin/users/${newId}`,
+      {
+        method: "PUT",
+        headers: {
+          ...svcHeaders,
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify({
+          email_confirm: true,
+          password,
+          user_metadata: { nome }
+        })
+      }
+    );
+    if (!confirmRes.ok) {
+      const cBody = await jsonOuErro(confirmRes);
+      console.warn("[usuarios] Confirmação pós-cadastro:", cBody);
     }
 
     const empresa_id = u.empresa_id;

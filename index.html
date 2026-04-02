@@ -497,7 +497,7 @@
     </div>
     <div class="campo">
       <label for="novo-user-senha">Senha</label>
-      <input type="password" id="novo-user-senha" placeholder="Mín. 6 caracteres" autocomplete="new-password">
+      <input type="password" id="novo-user-senha" placeholder="Mín. 8 caracteres (padrão Supabase)" autocomplete="new-password" minlength="8">
     </div>
     <div class="campo">
       <label for="novo-user-perfil">Perfil</label>
@@ -570,7 +570,8 @@ supabaseClient = window._supabaseClient;
     });
 
     if (error) {
-      document.getElementById("erro").innerText = "Login inválido";
+      document.getElementById("erro").innerText =
+        error.message || "Login inválido";
       return;
     }
 
@@ -605,6 +606,7 @@ supabaseClient = window._supabaseClient;
       function labelPerfil(p) {
         const x = String(p || "").toLowerCase();
         if (x === "mestre" || x === "master") return "Master";
+        if (x === "operador") return "Operador";
         if (!p) return "Master";
         return p.charAt(0).toUpperCase() + p.slice(1);
       }
@@ -752,6 +754,14 @@ supabaseClient = window._supabaseClient;
     if (msg) {
       msg.textContent = "";
       msg.className = "modal-msg";
+    }
+
+    if (!password || password.length < 8) {
+      if (msg) {
+        msg.textContent = "A senha deve ter no mínimo 8 caracteres.";
+        msg.classList.add("erro");
+      }
+      return;
     }
 
     try {
