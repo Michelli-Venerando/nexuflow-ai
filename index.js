@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import path from "node:path";
 
 dotenv.config();
 
@@ -161,9 +162,14 @@ function mensagemErroPostgrest(body) {
   if (!body || typeof body !== "object") return "";
   const parts = [
     body.message,
+    body.msg,
+    body.error_description,
+    body.error,
     body.details,
     body.hint,
-    body.description
+    body.description,
+    body.code ? `code: ${body.code}` : null,
+    body.error_code ? `error_code: ${body.error_code}` : null
   ].filter(Boolean);
   return parts.join(" — ");
 }
@@ -186,11 +192,16 @@ async function fetchEmpresaNome(baseUrl, empresaId, userToken) {
 
 const app = express();
 app.use(express.json());
-app.use(express.static("."));
 
-// TESTE
+function empresaIdFallback(explicit) {
+  if (explicit != null && explicit !== "") return explicit;
+  const envId = process.env.NEXUFLOW_DEFAULT_EMPRESA_ID;
+  if (envId && String(envId).trim()) return String(envId).trim();
+  return null;
+}
+
 app.get("/", (req, res) => {
-  res.send("Servidor OK");
+  res.sendFile(path.join(process.cwd(), "index.html"));
 });
 
 // 🔥 PERFIL
@@ -403,7 +414,7 @@ app.post("/transacoes", async (req, res) => {
       u = r2.usuario;
     }
 
-    const empresa_id = u?.empresa_id ?? null;
+    const empresa_id = empresaIdFallback(u?.empresa_id);
 
     const tipo = String(req.body.tipo || "").toLowerCase();
     const descricao = String(req.body.descricao || "").trim();
@@ -421,17 +432,17 @@ app.post("/transacoes", async (req, res) => {
       return res.status(400).json({ error: "Valor inválido." });
     }
 
-    function montarPayloadPT() {
+    function montarPayloadPT(comEmpresa) {
       const p = { tipo, dados, status };
       p["descrição"] = descricao;
       p.valentia = valor;
-      if (empresa_id) p.empresa_id = empresa_id;
+      if (comEmpresa && empresa_id) p.empresa_id = empresa_id;
       return p;
     }
 
-    function montarPayloadEN() {
+    function montarPayloadEN(comEmpresa) {
       const p = { tipo, dados, status, descricao, valor };
-      if (empresa_id) p.empresa_id = empresa_id;
+      if (comEmpresa && empresa_id) p.empresa_id = empresa_id;
       return p;
     }
 
@@ -446,14 +457,22 @@ app.post("/transacoes", async (req, res) => {
     }
 
     const tentativasPayload = [
-      montarPayloadPT(),
-      { ...montarPayloadPT(), status: "ativo" },
+      montarPayloadPT(true),
+      { ...montarPayloadPT(true), status: "ativo" },
       (() => {
-        const x = montarPayloadPT();
+        const x = montarPayloadPT(true);
         delete x.status;
         return x;
       })(),
-      montarPayloadEN()
+      montarPayloadEN(true),
+      montarPayloadPT(false),
+      { ...montarPayloadPT(false), status: "ativo" },
+      (() => {
+        const x = montarPayloadPT(false);
+        delete x.status;
+        return x;
+      })(),
+      montarPayloadEN(false)
     ];
 
     const ordemHeaders = headersSvcPost
@@ -476,7 +495,8 @@ app.post("/transacoes", async (req, res) => {
       console.error("Insert transacao:", body);
       return res.status(502).json({
         error: "Não foi possível salvar o lançamento.",
-        detalhe: mensagemErroPostgrest(body)
+        detalhe: mensagemErroPostgrest(body),
+        supabase: typeof body === "object" && body ? body : null
       });
     }
 
@@ -571,23 +591,36 @@ app.post("/usuarios", async (req, res) => {
       return res.status(400).json({ error: "Informe o nome do usuário." });
     }
 
-    const adminRes = await fetch(
-      `${process.env.SUPABASE_URL}/auth/v1/admin/users`,
+    const corposAdmin = [
+      { email, password, email_confirm: true, user_metadata: { nome } },
+      { email, password, email_confirm: true },
       {
-        method: "POST",
-        headers: {
-          ...svcHeaders,
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { nome }
-        })
+        email,
+        password,
+        email_confirm: true,
+        app_metadata: { provider: "email", providers: ["email"] }
       }
-    );
-    let created = await jsonOuErro(adminRes);
+    ];
+
+    let adminRes = { ok: false };
+    let created = null;
+    for (const corpo of corposAdmin) {
+      adminRes = await fetch(
+        `${process.env.SUPABASE_URL}/auth/v1/admin/users`,
+        {
+          method: "POST",
+          headers: {
+            apikey: svc,
+            Authorization: `Bearer ${svc}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(corpo)
+        }
+      );
+      created = await jsonOuErro(adminRes);
+      if (adminRes.ok) break;
+    }
+
     if (!adminRes.ok) {
       const msg =
         created?.msg ||
@@ -595,7 +628,15 @@ app.post("/usuarios", async (req, res) => {
         created?.error_description ||
         created?.error ||
         "Falha ao criar usuário no Auth";
-      return res.status(400).json({ error: msg });
+      const statusHttp =
+        adminRes.status === 409 || String(msg).toLowerCase().includes("already")
+          ? 409
+          : 400;
+      return res.status(statusHttp).json({
+        error: msg,
+        detalhe: mensagemErroPostgrest(created),
+        supabase: created
+      });
     }
 
     if (Array.isArray(created)) {
@@ -604,27 +645,10 @@ app.post("/usuarios", async (req, res) => {
 
     let newId = created?.id || created?.user?.id || created?.users?.[0]?.id;
     if (!newId) {
-      return res.status(502).json({ error: "Resposta inesperada ao criar usuário." });
-    }
-
-    const confirmRes = await fetch(
-      `${process.env.SUPABASE_URL}/auth/v1/admin/users/${newId}`,
-      {
-        method: "PUT",
-        headers: {
-          ...svcHeaders,
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify({
-          email_confirm: true,
-          password,
-          user_metadata: { nome }
-        })
-      }
-    );
-    if (!confirmRes.ok) {
-      const cBody = await jsonOuErro(confirmRes);
-      console.warn("[usuarios] Confirmação pós-cadastro:", cBody);
+      return res.status(502).json({
+        error: "Resposta inesperada ao criar usuário.",
+        supabase: created
+      });
     }
 
     const empresa_id = u.empresa_id;
@@ -673,6 +697,8 @@ app.post("/usuarios", async (req, res) => {
     res.status(500).json({ error: "Erro ao cadastrar usuário." });
   }
 });
+
+app.use(express.static(process.cwd()));
 
 // 🚀 START
 const PORT = process.env.PORT || 3000;

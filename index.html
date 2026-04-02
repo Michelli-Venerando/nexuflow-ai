@@ -570,6 +570,7 @@ supabaseClient = window._supabaseClient;
     });
 
     if (error) {
+      console.error("Supabase signIn:", error);
       document.getElementById("erro").innerText =
         error.message || "Login inválido";
       return;
@@ -647,6 +648,25 @@ supabaseClient = window._supabaseClient;
       console.error(erro);
       document.getElementById("erro").innerText = "Erro no servidor";
     }
+  }
+
+  function textoErroApi(j) {
+    const partes = [
+      j && j.error,
+      j && j.detalhe,
+      j && j.supabase && (j.supabase.msg || j.supabase.message),
+      j && j.supabase && j.supabase.details,
+      j && j.supabase && j.supabase.hint
+    ].filter(Boolean);
+    if (partes.length) return partes.join(" — ");
+    if (j && j.supabase && typeof j.supabase === "object") {
+      try {
+        return JSON.stringify(j.supabase).slice(0, 400);
+      } catch {
+        return "Erro na API";
+      }
+    }
+    return "";
   }
 
   function parseValorEntrada(v) {
@@ -781,8 +801,10 @@ supabaseClient = window._supabaseClient;
         j = {};
       }
       if (!response.ok) {
+        console.error("POST /usuarios", response.status, j);
         if (msg) {
-          msg.textContent = j.error || corpo.slice(0, 200) || "Erro ao cadastrar";
+          msg.textContent =
+            textoErroApi(j) || corpo.slice(0, 220) || "Erro ao cadastrar";
           msg.classList.add("erro");
         }
         return;
@@ -845,8 +867,10 @@ supabaseClient = window._supabaseClient;
         j = {};
       }
       if (!response.ok) {
+        console.error("POST /transacoes", response.status, j);
         if (msg) {
-          msg.textContent = j.error || j.detalhe || corpo.slice(0, 160) || "Erro ao salvar";
+          msg.textContent =
+            textoErroApi(j) || corpo.slice(0, 220) || "Erro ao salvar";
           msg.classList.add("erro");
         }
         return;
