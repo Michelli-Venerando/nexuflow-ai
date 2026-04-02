@@ -4,6 +4,42 @@ import fetch from "node-fetch";
 
 dotenv.config();
 
+async function buscarUsuarioPorSupabase(baseUrl, headersRest, userId, email) {
+  const select = "select=nome,perfil,empresa_id";
+  const filtros = [
+    `id=eq.${userId}`,
+    `user_id=eq.${userId}`,
+    `auth_user_id=eq.${userId}`,
+    `usuario_id=eq.${userId}`
+  ];
+  if (email) {
+    filtros.push(`email=eq.${encodeURIComponent(email)}`);
+    filtros.push(`e-mail=eq.${encodeURIComponent(email)}`);
+  }
+
+  let ultimoErroHttp = null;
+  let algumaRespostaOk = false;
+
+  for (const filtro of filtros) {
+    const url = `${baseUrl}/rest/v1/usuarios?${filtro}&${select}`;
+    const res = await fetch(url, { headers: headersRest });
+    const rows = await res.json();
+    if (!res.ok) {
+      ultimoErroHttp = rows;
+      continue;
+    }
+    algumaRespostaOk = true;
+    if (Array.isArray(rows) && rows.length > 0) {
+      return { usuario: rows[0], erro: null };
+    }
+  }
+
+  return {
+    usuario: null,
+    erro: algumaRespostaOk ? null : ultimoErroHttp
+  };
+}
+
 const app = express();
 app.use(express.json());
 app.use(express.static("."));
@@ -42,18 +78,20 @@ app.get("/perfil", async (req, res) => {
       Authorization: token
     };
 
-    const perfilUrl =
-      process.env.SUPABASE_URL +
-      `/rest/v1/usuarios?id=eq.${userId}&select=nome,perfil,empresa_id`;
-    const perfilResponse = await fetch(perfilUrl, { headers: headersRest });
-    const perfilData = await perfilResponse.json();
+    const { usuario: usuarioRow, erro: usuarioErro } =
+      await buscarUsuarioPorSupabase(
+        process.env.SUPABASE_URL,
+        headersRest,
+        userId,
+        userData.email
+      );
 
-    if (!perfilResponse.ok) {
-      console.error("Supabase usuarios:", perfilData);
+    if (usuarioErro && !usuarioRow) {
+      console.error("Supabase usuarios (todas tentativas falharam):", usuarioErro);
       return res.status(502).json({ error: "Erro ao buscar usuário" });
     }
 
-    const usuario = Array.isArray(perfilData) ? perfilData[0] || {} : {};
+    const usuario = usuarioRow || {};
     let empresaNome = "Empresa";
     const empresaId = usuario.empresa_id;
 
@@ -110,62 +148,43 @@ app.get("/transacoes", async (req, res) => {
     }
     const userId = userData.id;
 
-    const perfilResponse = await fetch(
-      process.env.SUPABASE_URL +
-        `/rest/v1/usuarios?id=eq.${userId}&select=empresa_id`,
-      {
-        headers: {
-          apikey: process.env.SUPABASE_KEY,
-          Authorization: token
-        }
-      }
+    const headersTrans = {
+      apikey: process.env.SUPABASE_KEY,
+      Authorization: token
+    };
+    const { usuario: usuarioTx } = await buscarUsuarioPorSupabase(
+      process.env.SUPABASE_URL,
+      headersTrans,
+      userId,
+      userData.email
     );
-
-    const perfilData = await perfilResponse.json();
-    const empresa_id = Array.isArray(perfilData) ? perfilData[0]?.empresa_id : undefined;
-
-    if (empresa_id == null) {
-      return res.json([]);
-    }
+    const empresa_id = usuarioTx?.empresa_id;
 
     const transSelect = encodeURIComponent('tipo,"descrição",valentia,dados,status');
     const baseTrans = `${process.env.SUPABASE_URL}/rest/v1/transacoes`;
 
-    let response = await fetch(
-      `${baseTrans}?empresa_id=eq.${empresa_id}&select=${transSelect}`,
-      {
-        headers: {
-          apikey: process.env.SUPABASE_KEY,
-          Authorization: token
-        }
-      }
-    );
+    async function fetchTransacoesLivres() {
+      return fetch(`${baseTrans}?select=${transSelect}`, {
+        headers: headersTrans
+      });
+    }
 
-    let data = await response.json();
+    let response;
+    let data;
+    let precisaListarTodas = empresa_id == null;
 
-    const apiErro = !response.ok && typeof data === "object" && data !== null;
-    const colunaEmpresaAusente =
-      apiErro &&
-      JSON.stringify(data).toLowerCase().includes("empresa_id");
-
-    if (colunaEmpresaAusente) {
-      console.warn(
-        "[transacoes] Coluna empresa_id ausente ou inválida; listando todas as linhas (ajuste o schema no Supabase)."
+    if (empresa_id != null) {
+      response = await fetch(
+        `${baseTrans}?empresa_id=eq.${empresa_id}&select=${transSelect}`,
+        { headers: headersTrans }
       );
-      response = await fetch(`${baseTrans}?select=${transSelect}`, {
-        headers: {
-          apikey: process.env.SUPABASE_KEY,
-          Authorization: token
-        }
-      });
       data = await response.json();
-    } else if (response.ok && Array.isArray(data) && data.length === 0) {
-      response = await fetch(`${baseTrans}?select=${transSelect}`, {
-        headers: {
-          apikey: process.env.SUPABASE_KEY,
-          Authorization: token
-        }
-      });
+      if (!response.ok) precisaListarTodas = true;
+      else if (Array.isArray(data) && data.length === 0) precisaListarTodas = true;
+    }
+
+    if (precisaListarTodas) {
+      response = await fetchTransacoesLivres();
       data = await response.json();
     }
 
