@@ -60,7 +60,6 @@ async function buscarTransacoesPostgrest(baseTrans, headersTrans, empresaId) {
   const sufixosSelect = [
     encodeURIComponent('tipo,"descrição",valentia,dados,status'),
     encodeURIComponent("tipo,descricao,valor,dados,status"),
-    encodeURIComponent("tipo,descricao,valor"),
     "*"
   ];
 
@@ -100,7 +99,8 @@ function parseDataLancamento(row) {
       const d = Number(br[1]);
       const m = Number(br[2]) - 1;
       const y = Number(br[3]);
-      return new Date(y, m, d, 12, 0, 0);
+      const dt = new Date(y, m, d, 12, 0, 0);
+      return Number.isNaN(dt.getTime()) ? null : dt;
     }
     const t = Date.parse(s);
     return Number.isNaN(t) ? null : new Date(t);
@@ -119,6 +119,53 @@ function filtrarTransacoesPorPeriodo(rows, deStr, ateStr) {
     if (ate && t > ate) return false;
     return true;
   });
+}
+
+function parseValorEntrada(v) {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  let s = String(v ?? "")
+    .trim()
+    .replace(/\s/g, "");
+  if (!s) return NaN;
+  const lastComma = s.lastIndexOf(",");
+  const lastDot = s.lastIndexOf(".");
+  if (lastComma > lastDot) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (lastComma >= 0 && lastDot < 0) {
+    s = s.replace(",", ".");
+  } else {
+    s = s.replace(/,/g, "");
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function normalizarDataParaISO(d) {
+  if (d == null || d === "") {
+    return new Date().toISOString().slice(0, 10);
+  }
+  const s = String(d).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (br) {
+    const dd = br[1].padStart(2, "0");
+    const mm = br[2].padStart(2, "0");
+    return `${br[3]}-${mm}-${dd}`;
+  }
+  const t = Date.parse(s);
+  if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+  return new Date().toISOString().slice(0, 10);
+}
+
+function mensagemErroPostgrest(body) {
+  if (!body || typeof body !== "object") return "";
+  const parts = [
+    body.message,
+    body.details,
+    body.hint,
+    body.description
+  ].filter(Boolean);
+  return parts.join(" — ");
 }
 
 async function fetchEmpresaNome(baseUrl, empresaId, userToken) {
@@ -419,7 +466,7 @@ app.post("/transacoes", async (req, res) => {
       console.error("Insert transacao:", body);
       return res.status(502).json({
         error: "Não foi possível salvar o lançamento.",
-        detalhe: body?.message || body?.hint || ""
+        detalhe: mensagemErroPostgrest(body)
       });
     }
 

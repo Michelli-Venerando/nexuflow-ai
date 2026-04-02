@@ -530,7 +530,7 @@
     </div>
     <div class="campo">
       <label for="lanc-valor">Valor (R$)</label>
-      <input type="number" id="lanc-valor" min="0.01" step="0.01" placeholder="0,00">
+      <input type="text" id="lanc-valor" inputmode="decimal" placeholder="0,00" autocomplete="off">
     </div>
     <div class="campo">
       <label for="lanc-data">Data</label>
@@ -647,6 +647,25 @@ supabaseClient = window._supabaseClient;
     }
   }
 
+  function parseValorEntrada(v) {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    let s = String(v ?? "")
+      .trim()
+      .replace(/\s/g, "");
+    if (!s) return NaN;
+    const lastComma = s.lastIndexOf(",");
+    const lastDot = s.lastIndexOf(".");
+    if (lastComma > lastDot) {
+      s = s.replace(/\./g, "").replace(",", ".");
+    } else if (lastComma >= 0 && lastDot < 0) {
+      s = s.replace(",", ".");
+    } else {
+      s = s.replace(/,/g, "");
+    }
+    const n = Number(s);
+    return Number.isFinite(n) ? n : NaN;
+  }
+
   function formatBRL(n) {
     const x = Number(n);
     if (!Number.isFinite(x)) return "R$ 0,00";
@@ -658,7 +677,7 @@ supabaseClient = window._supabaseClient;
 
   function numValor(t) {
     const v = t.valor ?? t.valentia;
-    const n = Number(v);
+    const n = parseValorEntrada(v);
     return Number.isFinite(n) ? n : 0;
   }
 
@@ -670,6 +689,14 @@ supabaseClient = window._supabaseClient;
     if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
     const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (br) return s;
+    const t = Date.parse(s);
+    if (!Number.isNaN(t)) {
+      const d = new Date(t);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yy = d.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    }
     return s;
   }
 
@@ -750,13 +777,10 @@ supabaseClient = window._supabaseClient;
         }
         return;
       }
-      if (msg) {
-        msg.textContent = "Usuário cadastrado com sucesso.";
-        msg.classList.add("ok");
-      }
       document.getElementById("novo-user-nome").value = "";
       document.getElementById("novo-user-email").value = "";
       document.getElementById("novo-user-senha").value = "";
+      fecharModalUsuario();
     } catch (e) {
       console.error(e);
       if (msg) {
@@ -770,12 +794,23 @@ supabaseClient = window._supabaseClient;
     const msg = document.getElementById("msg-modal-lanc");
     const descricao = document.getElementById("lanc-desc")?.value?.trim();
     const tipo = document.getElementById("lanc-tipo")?.value;
-    const valor = Number(document.getElementById("lanc-valor")?.value);
+    const valor = parseValorEntrada(
+      document.getElementById("lanc-valor")?.value
+    );
     const dados = document.getElementById("lanc-data")?.value;
 
     if (msg) {
       msg.textContent = "";
       msg.className = "modal-msg";
+    }
+
+    if (!Number.isFinite(valor) || valor <= 0) {
+      if (msg) {
+        msg.textContent =
+          "Informe um valor válido (ex.: 50 ou 50,00).";
+        msg.classList.add("erro");
+      }
+      return;
     }
 
     try {
