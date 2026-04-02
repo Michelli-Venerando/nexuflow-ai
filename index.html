@@ -180,18 +180,34 @@ supabaseClient = window._supabaseClient;
 
       const data = await response.json();
 
-      if (!data) {
-        document.getElementById("erro").innerText = "Erro ao carregar perfil";
+      if (!response.ok || data.error) {
+        document.getElementById("erro").innerText =
+          data.error || "Erro ao carregar perfil";
         return;
       }
 
       document.getElementById("login-container").style.display = "none";
       document.getElementById("dashboard").style.display = "block";
 
-      // 🔥 FORMATA COMO VOCÊ QUERIA
+      function labelPerfil(p) {
+        const x = String(p || "").toLowerCase();
+        if (x === "mestre" || x === "master") return "Master";
+        if (!p) return "Master";
+        return p.charAt(0).toUpperCase() + p.slice(1);
+      }
+
+      const perfilTxt = labelPerfil(data.perfil);
+      let empresaTxt = data.empresa || "";
+      if (/^mestre-/i.test(empresaTxt)) {
+        empresaTxt = empresaTxt.replace(/^mestre-/i, "");
+      }
+
       const nomeFinal =
-        (data.perfil || "perfil") + " - " +
-        (data.empresa || "Empresa") + " - " +
+        "Olá " +
+        perfilTxt +
+        "-" +
+        empresaTxt +
+        " - " +
         (data.nome || data.email);
 
       document.getElementById("nome").innerText = nomeFinal;
@@ -226,7 +242,12 @@ supabaseClient = window._supabaseClient;
 
       data.forEach(t => {
         const li = document.createElement("li");
-        li.innerText = `${t.descricao} - R$ ${t.valor}`;
+        const d =
+          t.descricao ??
+          t["descrição"] ??
+          "";
+        const v = t.valor ?? t.valentia ?? "";
+        li.innerText = `${d} - R$ ${v}`;
         lista.appendChild(li);
       });
 

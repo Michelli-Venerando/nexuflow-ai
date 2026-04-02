@@ -38,9 +38,12 @@ app.get("/perfil", async (req, res) => {
     }
     const userId = userData.id;
 
+    const perfilSelect = encodeURIComponent(
+      'nome,"e-mail",perfil,empresa_id,empresas(nome)'
+    );
     const perfilResponse = await fetch(
       process.env.SUPABASE_URL +
-        `/rest/v1/usuarios?id=eq.${userId}&select=nome,email,perfil,empresa_id,empresas(nome)`,
+        `/rest/v1/usuarios?id=eq.${userId}&select=${perfilSelect}`,
       {
         headers: {
           apikey: process.env.SUPABASE_KEY,
@@ -50,15 +53,21 @@ app.get("/perfil", async (req, res) => {
     );
 
     const perfilData = await perfilResponse.json();
-    const usuario = perfilData[0] || {};
+    if (!perfilResponse.ok) {
+      console.error("Supabase usuarios:", perfilData);
+      return res.status(502).json({ error: "Erro ao buscar usuário" });
+    }
 
-res.json({
-  nome: usuario.nome || userData.email,
-  email: usuario.email || userData.email,
-  perfil: usuario.perfil || "master",
-  empresa: usuario.empresas?.nome || "Empresa",
-  empresa_id: usuario.empresa_id || null
-});
+    const usuario = Array.isArray(perfilData) ? perfilData[0] || {} : {};
+    const emailUsuario = usuario["e-mail"] ?? usuario.email;
+
+    res.json({
+      nome: usuario.nome || userData.email,
+      email: emailUsuario || userData.email,
+      perfil: usuario.perfil || "mestre",
+      empresa: usuario.empresas?.nome || "Empresa",
+      empresa_id: usuario.empresa_id ?? null
+    });
 
   } catch (erro) {
     console.error(erro);
@@ -109,9 +118,11 @@ app.get("/transacoes", async (req, res) => {
       return res.json([]);
     }
 
-    const response = await fetch(
-      process.env.SUPABASE_URL +
-        `/rest/v1/transacoes?empresa_id=eq.${empresa_id}`,
+    const transSelect = encodeURIComponent('tipo,"descrição",valentia,dados,status');
+    const baseTrans = `${process.env.SUPABASE_URL}/rest/v1/transacoes`;
+
+    let response = await fetch(
+      `${baseTrans}?empresa_id=eq.${empresa_id}&select=${transSelect}`,
       {
         headers: {
           apikey: process.env.SUPABASE_KEY,
@@ -120,9 +131,47 @@ app.get("/transacoes", async (req, res) => {
       }
     );
 
-    const data = await response.json();
+    let data = await response.json();
 
-    res.json(data);
+    const apiErro = !response.ok && typeof data === "object" && data !== null;
+    const colunaEmpresaAusente =
+      apiErro &&
+      JSON.stringify(data).toLowerCase().includes("empresa_id");
+
+    if (colunaEmpresaAusente) {
+      console.warn(
+        "[transacoes] Coluna empresa_id ausente ou inválida; listando todas as linhas (ajuste o schema no Supabase)."
+      );
+      response = await fetch(`${baseTrans}?select=${transSelect}`, {
+        headers: {
+          apikey: process.env.SUPABASE_KEY,
+          Authorization: token
+        }
+      });
+      data = await response.json();
+    } else if (response.ok && Array.isArray(data) && data.length === 0) {
+      response = await fetch(`${baseTrans}?select=${transSelect}`, {
+        headers: {
+          apikey: process.env.SUPABASE_KEY,
+          Authorization: token
+        }
+      });
+      data = await response.json();
+    }
+
+    if (!response.ok) {
+      console.error("Supabase transacoes:", data);
+      return res.status(502).send("Erro ao buscar transações");
+    }
+
+    const lista = Array.isArray(data) ? data : [];
+    res.json(
+      lista.map((row) => ({
+        ...row,
+        descricao: row["descrição"] ?? row.descricao,
+        valor: row.valentia ?? row.valor
+      }))
+    );
 
   } catch (erro) {
     console.error("Erro:", erro);
