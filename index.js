@@ -37,36 +37,46 @@ app.get("/perfil", async (req, res) => {
       return res.status(401).json({ error: "Sessão inválida" });
     }
     const userId = userData.id;
+    const headersRest = {
+      apikey: process.env.SUPABASE_KEY,
+      Authorization: token
+    };
 
-    const perfilSelect = encodeURIComponent(
-      'nome,"e-mail",perfil,empresa_id,empresas(nome)'
-    );
-    const perfilResponse = await fetch(
+    const perfilUrl =
       process.env.SUPABASE_URL +
-        `/rest/v1/usuarios?id=eq.${userId}&select=${perfilSelect}`,
-      {
-        headers: {
-          apikey: process.env.SUPABASE_KEY,
-          Authorization: token
-        }
-      }
-    );
-
+      `/rest/v1/usuarios?id=eq.${userId}&select=nome,perfil,empresa_id`;
+    const perfilResponse = await fetch(perfilUrl, { headers: headersRest });
     const perfilData = await perfilResponse.json();
+
     if (!perfilResponse.ok) {
       console.error("Supabase usuarios:", perfilData);
       return res.status(502).json({ error: "Erro ao buscar usuário" });
     }
 
     const usuario = Array.isArray(perfilData) ? perfilData[0] || {} : {};
-    const emailUsuario = usuario["e-mail"] ?? usuario.email;
+    let empresaNome = "Empresa";
+    const empresaId = usuario.empresa_id;
+
+    if (empresaId) {
+      const empRes = await fetch(
+        process.env.SUPABASE_URL +
+          `/rest/v1/empresas?id=eq.${empresaId}&select=nome`,
+        { headers: headersRest }
+      );
+      const empRows = await empRes.json();
+      if (empRes.ok && Array.isArray(empRows) && empRows[0]?.nome) {
+        empresaNome = empRows[0].nome;
+      }
+    }
+
+    const emailUsuario = userData.email;
 
     res.json({
       nome: usuario.nome || userData.email,
-      email: emailUsuario || userData.email,
+      email: emailUsuario,
       perfil: usuario.perfil || "mestre",
-      empresa: usuario.empresas?.nome || "Empresa",
-      empresa_id: usuario.empresa_id ?? null
+      empresa: empresaNome,
+      empresa_id: empresaId ?? null
     });
 
   } catch (erro) {
