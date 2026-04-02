@@ -18,6 +18,10 @@ app.get("/perfil", async (req, res) => {
   try {
     const token = req.headers.authorization;
 
+    if (!token) {
+      return res.status(401).json({ error: "Não autorizado" });
+    }
+
     const userResponse = await fetch(
       process.env.SUPABASE_URL + "/auth/v1/user",
       {
@@ -29,6 +33,9 @@ app.get("/perfil", async (req, res) => {
     );
 
     const userData = await userResponse.json();
+    if (!userResponse.ok || !userData?.id) {
+      return res.status(401).json({ error: "Sessão inválida" });
+    }
     const userId = userData.id;
 
     const perfilResponse = await fetch(
@@ -37,7 +44,7 @@ app.get("/perfil", async (req, res) => {
       {
         headers: {
           apikey: process.env.SUPABASE_KEY,
-          Authorization: "Bearer " + process.env.SUPABASE_KEY
+          Authorization: token
         }
       }
     );
@@ -79,6 +86,9 @@ app.get("/transacoes", async (req, res) => {
     );
 
     const userData = await userResponse.json();
+    if (!userResponse.ok || !userData?.id) {
+      return res.status(401).send("Sessão inválida");
+    }
     const userId = userData.id;
 
     const perfilResponse = await fetch(
@@ -87,13 +97,17 @@ app.get("/transacoes", async (req, res) => {
       {
         headers: {
           apikey: process.env.SUPABASE_KEY,
-          Authorization: "Bearer " + process.env.SUPABASE_KEY
+          Authorization: token
         }
       }
     );
 
     const perfilData = await perfilResponse.json();
-    const empresa_id = perfilData[0]?.empresa_id;
+    const empresa_id = Array.isArray(perfilData) ? perfilData[0]?.empresa_id : undefined;
+
+    if (empresa_id == null) {
+      return res.json([]);
+    }
 
     const response = await fetch(
       process.env.SUPABASE_URL +
@@ -101,7 +115,7 @@ app.get("/transacoes", async (req, res) => {
       {
         headers: {
           apikey: process.env.SUPABASE_KEY,
-          Authorization: "Bearer " + process.env.SUPABASE_KEY
+          Authorization: token
         }
       }
     );
