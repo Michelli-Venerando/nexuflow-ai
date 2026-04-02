@@ -40,6 +40,48 @@ async function buscarUsuarioPorSupabase(baseUrl, headersRest, userId, email) {
   };
 }
 
+async function jsonOuErro(res) {
+  const texto = await res.text();
+  if (!texto) return null;
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return { message: texto.slice(0, 200) };
+  }
+}
+
+async function buscarTransacoesPostgrest(baseTrans, headersTrans, empresaId) {
+  const sufixosSelect = [
+    encodeURIComponent('tipo,"descrição",valentia,dados,status'),
+    encodeURIComponent("tipo,descricao,valor,dados,status"),
+    encodeURIComponent("tipo,descricao,valor"),
+    "*"
+  ];
+
+  async function tentar(queryBase) {
+    for (const sel of sufixosSelect) {
+      const sep = queryBase.includes("?") ? "&" : "?";
+      const q =
+        sel === "*" ? `${sep}select=*` : `${sep}select=${sel}`;
+      const url = `${baseTrans}${queryBase}${q}`;
+      const r = await fetch(url, { headers: headersTrans });
+      const data = await jsonOuErro(r);
+      if (r.ok && Array.isArray(data)) {
+        return { ok: true, data };
+      }
+      console.warn("[transacoes] tentativa select falhou", sel, r.status, data);
+    }
+    return { ok: false, data: null, status: 502 };
+  }
+
+  if (empresaId != null) {
+    const filtrado = await tentar(`?empresa_id=eq.${empresaId}`);
+    if (filtrado.ok && filtrado.data.length > 0) return filtrado;
+  }
+
+  return tentar("");
+}
+
 const app = express();
 app.use(express.json());
 app.use(express.static("."));
@@ -159,41 +201,22 @@ app.get("/transacoes", async (req, res) => {
       userData.email
     );
     const empresa_id = usuarioTx?.empresa_id;
-
-    const transSelect = encodeURIComponent('tipo,"descrição",valentia,dados,status');
     const baseTrans = `${process.env.SUPABASE_URL}/rest/v1/transacoes`;
 
-    async function fetchTransacoesLivres() {
-      return fetch(`${baseTrans}?select=${transSelect}`, {
-        headers: headersTrans
+    const { ok, data } = await buscarTransacoesPostgrest(
+      baseTrans,
+      headersTrans,
+      empresa_id
+    );
+
+    if (!ok || !Array.isArray(data)) {
+      return res.status(502).json({
+        error: "Erro ao buscar transações",
+        detalhe: "Verifique nomes das colunas e políticas RLS no Supabase."
       });
     }
 
-    let response;
-    let data;
-    let precisaListarTodas = empresa_id == null;
-
-    if (empresa_id != null) {
-      response = await fetch(
-        `${baseTrans}?empresa_id=eq.${empresa_id}&select=${transSelect}`,
-        { headers: headersTrans }
-      );
-      data = await response.json();
-      if (!response.ok) precisaListarTodas = true;
-      else if (Array.isArray(data) && data.length === 0) precisaListarTodas = true;
-    }
-
-    if (precisaListarTodas) {
-      response = await fetchTransacoesLivres();
-      data = await response.json();
-    }
-
-    if (!response.ok) {
-      console.error("Supabase transacoes:", data);
-      return res.status(502).send("Erro ao buscar transações");
-    }
-
-    const lista = Array.isArray(data) ? data : [];
+    const lista = data;
     res.json(
       lista.map((row) => ({
         ...row,

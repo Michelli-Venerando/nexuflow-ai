@@ -230,10 +230,28 @@ supabaseClient = window._supabaseClient;
         }
       });
 
-      const data = await response.json();
+      const corpo = await response.text();
+      let data;
+      try {
+        data = corpo ? JSON.parse(corpo) : null;
+      } catch {
+        data = null;
+      }
 
       const lista = document.getElementById("lista");
       lista.innerHTML = "";
+
+      if (!response.ok) {
+        const msg =
+          (data && data.error) ||
+          (data && data.detalhe) ||
+          corpo.slice(0, 120) ||
+          "Erro ao carregar transações";
+        const liErro = document.createElement("li");
+        liErro.textContent = msg;
+        lista.appendChild(liErro);
+        return;
+      }
 
       if (!Array.isArray(data) || data.length === 0) {
         lista.innerHTML = "<li>Sem dados</li>";
