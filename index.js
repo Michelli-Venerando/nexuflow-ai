@@ -4,6 +4,12 @@ import fetch from "node-fetch";
 
 dotenv.config();
 
+function headersServiceRole() {
+  const k = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!k) return null;
+  return { apikey: k, Authorization: `Bearer ${k}` };
+}
+
 async function buscarUsuarioPorSupabase(baseUrl, headersRest, userId, email) {
   const select = "select=nome,perfil,empresa_id";
   const filtros = [
@@ -82,6 +88,55 @@ async function buscarTransacoesPostgrest(baseTrans, headersTrans, empresaId) {
   return tentar("");
 }
 
+function parseDataLancamento(row) {
+  const raw = row.dados ?? row.data ?? row.data_lancamento;
+  if (raw == null || raw === "") return null;
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return new Date(`${iso[1]}-${iso[2]}-${iso[3]}T12:00:00`);
+    const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (br) {
+      const d = Number(br[1]);
+      const m = Number(br[2]) - 1;
+      const y = Number(br[3]);
+      return new Date(y, m, d, 12, 0, 0);
+    }
+    const t = Date.parse(s);
+    return Number.isNaN(t) ? null : new Date(t);
+  }
+  return new Date(raw);
+}
+
+function filtrarTransacoesPorPeriodo(rows, deStr, ateStr) {
+  if (!deStr && !ateStr) return rows;
+  const de = deStr ? new Date(`${deStr}T00:00:00`) : null;
+  const ate = ateStr ? new Date(`${ateStr}T23:59:59.999`) : null;
+  return rows.filter((row) => {
+    const t = parseDataLancamento(row);
+    if (!t || Number.isNaN(t.getTime())) return false;
+    if (de && t < de) return false;
+    if (ate && t > ate) return false;
+    return true;
+  });
+}
+
+async function fetchEmpresaNome(baseUrl, empresaId, userToken) {
+  if (!empresaId) return null;
+  const svc = headersServiceRole();
+  const headers = svc || {
+    apikey: process.env.SUPABASE_KEY,
+    Authorization: userToken
+  };
+  const res = await fetch(
+    `${baseUrl}/rest/v1/empresas?id=eq.${empresaId}&select=nome`,
+    { headers }
+  );
+  const rows = await res.json();
+  if (!res.ok || !Array.isArray(rows) || !rows[0]?.nome) return null;
+  return rows[0].nome;
+}
+
 const app = express();
 app.use(express.json());
 app.use(express.static("."));
@@ -120,7 +175,7 @@ app.get("/perfil", async (req, res) => {
       Authorization: token
     };
 
-    const { usuario: usuarioRow, erro: usuarioErro } =
+    let { usuario: usuarioRow, erro: usuarioErro } =
       await buscarUsuarioPorSupabase(
         process.env.SUPABASE_URL,
         headersRest,
@@ -128,35 +183,44 @@ app.get("/perfil", async (req, res) => {
         userData.email
       );
 
+    const svc = headersServiceRole();
+    if (!usuarioRow && svc) {
+      const again = await buscarUsuarioPorSupabase(
+        process.env.SUPABASE_URL,
+        svc,
+        userId,
+        userData.email
+      );
+      usuarioRow = again.usuario;
+      if (!usuarioErro) usuarioErro = again.erro;
+    }
+
     if (usuarioErro && !usuarioRow) {
       console.error("Supabase usuarios (todas tentativas falharam):", usuarioErro);
       return res.status(502).json({ error: "Erro ao buscar usuário" });
     }
 
     const usuario = usuarioRow || {};
-    let empresaNome = "Empresa";
-    const empresaId = usuario.empresa_id;
-
-    if (empresaId) {
-      const empRes = await fetch(
-        process.env.SUPABASE_URL +
-          `/rest/v1/empresas?id=eq.${empresaId}&select=nome`,
-        { headers: headersRest }
-      );
-      const empRows = await empRes.json();
-      if (empRes.ok && Array.isArray(empRows) && empRows[0]?.nome) {
-        empresaNome = empRows[0].nome;
-      }
-    }
+    const empresaId = usuario.empresa_id ?? null;
+    let empresaNome =
+      (await fetchEmpresaNome(
+        process.env.SUPABASE_URL,
+        empresaId,
+        token
+      )) || "Empresa";
 
     const emailUsuario = userData.email;
+    const nomePessoa = usuario.nome?.trim() || userData.email?.split("@")[0] || "Usuário";
+    const perfilRaw = usuario.perfil || "mestre";
 
     res.json({
-      nome: usuario.nome || userData.email,
+      nome: nomePessoa,
+      nome_usuario: nomePessoa,
       email: emailUsuario,
-      perfil: usuario.perfil || "mestre",
+      perfil: perfilRaw,
       empresa: empresaNome,
-      empresa_id: empresaId ?? null
+      empresa_nome: empresaNome,
+      empresa_id: empresaId
     });
 
   } catch (erro) {
@@ -216,18 +280,313 @@ app.get("/transacoes", async (req, res) => {
       });
     }
 
-    const lista = data;
-    res.json(
-      lista.map((row) => ({
-        ...row,
-        descricao: row["descrição"] ?? row.descricao,
-        valor: row.valentia ?? row.valor
-      }))
-    );
+    let lista = data.map((row) => ({
+      ...row,
+      descricao: row["descrição"] ?? row.descricao,
+      valor: row.valentia ?? row.valor
+    }));
 
+    const de = req.query.de;
+    const ate = req.query.ate;
+    if (de || ate) {
+      lista = filtrarTransacoesPorPeriodo(lista, de || "", ate || "");
+    }
+
+    res.json(lista);
   } catch (erro) {
     console.error("Erro:", erro);
     res.status(500).send("Erro ao buscar dados");
+  }
+});
+
+function perfilEhMaster(usuario) {
+  const p = String(usuario?.perfil || "").toLowerCase();
+  return p === "mestre" || p === "master";
+}
+
+app.post("/transacoes", async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+    if (!token) {
+      return res.status(401).json({ error: "Não autorizado" });
+    }
+
+    const userResponse = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          Authorization: token,
+          apikey: process.env.SUPABASE_KEY
+        }
+      }
+    );
+    const userData = await userResponse.json();
+    if (!userResponse.ok || !userData?.id) {
+      return res.status(401).json({ error: "Sessão inválida" });
+    }
+
+    const headersUser = {
+      apikey: process.env.SUPABASE_KEY,
+      Authorization: token,
+      "Content-Type": "application/json",
+      Prefer: "return=representation"
+    };
+    const svc = headersServiceRole();
+    const headersSvcPost = svc
+      ? {
+          ...svc,
+          "Content-Type": "application/json",
+          Prefer: "return=representation"
+        }
+      : null;
+
+    let { usuario: u } = await buscarUsuarioPorSupabase(
+      process.env.SUPABASE_URL,
+      headersUser,
+      userData.id,
+      userData.email
+    );
+    if (!u && svc) {
+      const r2 = await buscarUsuarioPorSupabase(
+        process.env.SUPABASE_URL,
+        svc,
+        userData.id,
+        userData.email
+      );
+      u = r2.usuario;
+    }
+
+    const empresa_id = u?.empresa_id ?? null;
+
+    const tipo = String(req.body.tipo || "").toLowerCase();
+    const descricao = String(req.body.descricao || "").trim();
+    const valor = Number(req.body.valor);
+    const dados =
+      req.body.dados ||
+      new Date().toISOString().slice(0, 10);
+    const status = String(req.body.status || "ativo");
+
+    if (!["pagar", "receber"].includes(tipo)) {
+      return res.status(400).json({ error: "Tipo deve ser pagar ou receber." });
+    }
+    if (!descricao) {
+      return res.status(400).json({ error: "Informe a descrição." });
+    }
+    if (!Number.isFinite(valor) || valor <= 0) {
+      return res.status(400).json({ error: "Valor inválido." });
+    }
+
+    const payload = {
+      tipo,
+      dados,
+      status
+    };
+    payload["descrição"] = descricao;
+    payload.valentia = valor;
+    if (empresa_id) payload.empresa_id = empresa_id;
+
+    let ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
+      method: "POST",
+      headers: headersUser,
+      body: JSON.stringify(payload)
+    });
+    let body = await jsonOuErro(ins);
+
+    if (!ins.ok && headersSvcPost) {
+      ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
+        method: "POST",
+        headers: headersSvcPost,
+        body: JSON.stringify(payload)
+      });
+      body = await jsonOuErro(ins);
+    }
+
+    if (!ins.ok) {
+      const alt = { ...payload };
+      delete alt["descrição"];
+      alt.descricao = descricao;
+      delete alt.valentia;
+      alt.valor = valor;
+      ins = await fetch(`${process.env.SUPABASE_URL}/rest/v1/transacoes`, {
+        method: "POST",
+        headers: headersSvcPost || headersUser,
+        body: JSON.stringify(alt)
+      });
+      body = await jsonOuErro(ins);
+    }
+
+    if (!ins.ok) {
+      console.error("Insert transacao:", body);
+      return res.status(502).json({
+        error: "Não foi possível salvar o lançamento.",
+        detalhe: body?.message || body?.hint || ""
+      });
+    }
+
+    const row = Array.isArray(body) ? body[0] : body;
+    res.status(201).json({
+      ok: true,
+      item: {
+        ...row,
+        descricao: row?.["descrição"] ?? row?.descricao ?? descricao,
+        valor: row?.valentia ?? row?.valor ?? valor
+      }
+    });
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ error: "Erro ao salvar lançamento." });
+  }
+});
+
+app.post("/usuarios", async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+    if (!token) {
+      return res.status(401).json({ error: "Não autorizado" });
+    }
+
+    const svc = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!svc) {
+      return res.status(503).json({
+        error:
+          "Cadastro de usuários requer SUPABASE_SERVICE_ROLE_KEY no servidor (Render)."
+      });
+    }
+
+    const userResponse = await fetch(
+      process.env.SUPABASE_URL + "/auth/v1/user",
+      {
+        headers: {
+          Authorization: token,
+          apikey: process.env.SUPABASE_KEY
+        }
+      }
+    );
+    const userData = await userResponse.json();
+    if (!userResponse.ok || !userData?.id) {
+      return res.status(401).json({ error: "Sessão inválida" });
+    }
+
+    const headersUser = {
+      apikey: process.env.SUPABASE_KEY,
+      Authorization: token
+    };
+    const svcHeaders = {
+      apikey: svc,
+      Authorization: `Bearer ${svc}`,
+      "Content-Type": "application/json"
+    };
+
+    let { usuario: u } = await buscarUsuarioPorSupabase(
+      process.env.SUPABASE_URL,
+      headersUser,
+      userData.id,
+      userData.email
+    );
+    if (!u) {
+      const r2 = await buscarUsuarioPorSupabase(
+        process.env.SUPABASE_URL,
+        svcHeaders,
+        userData.id,
+        userData.email
+      );
+      u = r2.usuario;
+    }
+
+    if (!perfilEhMaster(u)) {
+      return res.status(403).json({ error: "Apenas Master pode cadastrar usuários." });
+    }
+
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+    const nome = String(req.body.nome || "").trim();
+    const perfilNovo = String(req.body.perfil || "operador")
+      .toLowerCase()
+      .trim() || "operador";
+
+    if (!email || !password || password.length < 6) {
+      return res
+        .status(400)
+        .json({ error: "E-mail e senha (mín. 6 caracteres) são obrigatórios." });
+    }
+    if (!nome) {
+      return res.status(400).json({ error: "Informe o nome do usuário." });
+    }
+
+    const adminRes = await fetch(
+      `${process.env.SUPABASE_URL}/auth/v1/admin/users`,
+      {
+        method: "POST",
+        headers: {
+          ...svcHeaders,
+          Prefer: "return=representation"
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          email_confirm: true
+        })
+      }
+    );
+    const created = await jsonOuErro(adminRes);
+    if (!adminRes.ok) {
+      const msg =
+        created?.msg ||
+        created?.message ||
+        created?.error_description ||
+        "Falha ao criar usuário no Auth";
+      return res.status(400).json({ error: msg });
+    }
+
+    const newId = created.id || created.user?.id;
+    if (!newId) {
+      return res.status(502).json({ error: "Resposta inesperada ao criar usuário." });
+    }
+
+    const empresa_id = u.empresa_id;
+    const rowUsuario = {
+      id: newId,
+      nome,
+      perfil: perfilNovo,
+      empresa_id
+    };
+    rowUsuario["e-mail"] = email;
+
+    let insU = await fetch(`${process.env.SUPABASE_URL}/rest/v1/usuarios`, {
+      method: "POST",
+      headers: {
+        ...svcHeaders,
+        Prefer: "return=minimal"
+      },
+      body: JSON.stringify(rowUsuario)
+    });
+
+    if (!insU.ok) {
+      const tryAlt = { id: newId, nome, perfil: perfilNovo, empresa_id, email };
+      insU = await fetch(`${process.env.SUPABASE_URL}/rest/v1/usuarios`, {
+        method: "POST",
+        headers: {
+          ...svcHeaders,
+          Prefer: "return=minimal"
+        },
+        body: JSON.stringify(tryAlt)
+      });
+    }
+
+    if (!insU.ok) {
+      const errBody = await jsonOuErro(insU);
+      console.error("Insert usuarios após auth:", errBody);
+      return res.status(502).json({
+        error:
+          "Usuário criado no login, mas falhou ao gravar na tabela usuarios. Ajuste colunas (e-mail/email) ou RLS.",
+        detalhe: errBody?.message || ""
+      });
+    }
+
+    res.status(201).json({ ok: true, id: newId, email, nome });
+  } catch (erro) {
+    console.error(erro);
+    res.status(500).json({ error: "Erro ao cadastrar usuário." });
   }
 });
 

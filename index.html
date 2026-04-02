@@ -250,6 +250,153 @@
       color: var(--muted);
       padding: 24px;
     }
+
+    .dash-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px 16px;
+      margin-bottom: 20px;
+      padding: 16px 18px;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .dash-toolbar label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .dash-toolbar input[type="date"],
+    .dash-toolbar input[type="text"],
+    .dash-toolbar input[type="email"],
+    .dash-toolbar input[type="password"],
+    .dash-toolbar input[type="number"],
+    .dash-toolbar select {
+      padding: 8px 10px;
+      border: 1px solid #dde1e6;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      min-width: 140px;
+    }
+
+    .btn-primary {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .btn-primary:hover {
+      background: #1d4ed8;
+    }
+
+    .btn-secondary {
+      padding: 9px 16px;
+      border: 1px solid #dde1e6;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--text);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+    }
+
+    .btn-master {
+      background: #0d9488;
+      color: #fff;
+    }
+
+    .btn-master:hover {
+      background: #0f766e;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.aberto {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+      max-width: 420px;
+      width: 100%;
+      padding: 24px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-box h3 {
+      margin: 0 0 16px;
+      font-size: 1.15rem;
+    }
+
+    .modal-box .campo {
+      margin-bottom: 14px;
+    }
+
+    .modal-box .campo label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .modal-box .campo input,
+    .modal-box .campo select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #dde1e6;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    .modal-acoes {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .modal-msg {
+      font-size: 0.85rem;
+      margin-top: 10px;
+      min-height: 1.2em;
+    }
+
+    .modal-msg.erro {
+      color: #dc2626;
+    }
+
+    .modal-msg.ok {
+      color: #059669;
+    }
   </style>
 </head>
 <body>
@@ -272,9 +419,31 @@
     <h1>💰 Painel Financeiro Nexuflow</h1>
     <div class="dash-meta">
       <span id="nome"></span>
+      <button type="button" id="btn-cadastrar-usuario" class="btn-secondary btn-master" style="display:none;" onclick="abrirModalUsuario()">Cadastrar usuário</button>
       <button type="button" class="btn-sair" onclick="logout()">Sair</button>
     </div>
   </header>
+
+  <div class="dash-toolbar">
+    <div>
+      <label for="filtro-de">De</label>
+      <input type="date" id="filtro-de">
+    </div>
+    <div>
+      <label for="filtro-ate">Até</label>
+      <input type="date" id="filtro-ate">
+    </div>
+    <div style="align-self:flex-end;">
+      <button type="button" class="btn-secondary" onclick="limparFiltroDatas()">Limpar datas</button>
+    </div>
+    <div style="align-self:flex-end;">
+      <button type="button" class="btn-primary" onclick="carregarTransacoes()">Aplicar filtro</button>
+    </div>
+    <div style="flex:1;min-width:8px;"></div>
+    <div style="align-self:flex-end;">
+      <button type="button" class="btn-primary" onclick="abrirModalLancamento()">Novo lançamento</button>
+    </div>
+  </div>
 
   <div class="dash-cards">
     <div class="dash-card">
@@ -304,6 +473,7 @@
     <table id="tabela-mov" style="display:none;">
       <thead>
         <tr>
+          <th>Data</th>
           <th>Descrição</th>
           <th>Tipo</th>
           <th class="num">Valor</th>
@@ -311,6 +481,66 @@
       </thead>
       <tbody id="lista"></tbody>
     </table>
+  </div>
+</div>
+
+<div id="modal-usuario" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-usuario">
+  <div class="modal-box">
+    <h3 id="titulo-modal-usuario">Cadastrar usuário</h3>
+    <div class="campo">
+      <label for="novo-user-nome">Nome</label>
+      <input type="text" id="novo-user-nome" placeholder="Nome completo" autocomplete="name">
+    </div>
+    <div class="campo">
+      <label for="novo-user-email">E-mail</label>
+      <input type="email" id="novo-user-email" placeholder="email@empresa.com" autocomplete="off">
+    </div>
+    <div class="campo">
+      <label for="novo-user-senha">Senha</label>
+      <input type="password" id="novo-user-senha" placeholder="Mín. 6 caracteres" autocomplete="new-password">
+    </div>
+    <div class="campo">
+      <label for="novo-user-perfil">Perfil</label>
+      <select id="novo-user-perfil">
+        <option value="operador">Operador</option>
+        <option value="mestre">Master</option>
+      </select>
+    </div>
+    <p id="msg-modal-usuario" class="modal-msg"></p>
+    <div class="modal-acoes">
+      <button type="button" class="btn-secondary" onclick="fecharModalUsuario()">Cancelar</button>
+      <button type="button" class="btn-primary" onclick="salvarNovoUsuario()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="modal-lancamento" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="titulo-modal-lanc">
+  <div class="modal-box">
+    <h3 id="titulo-modal-lanc">Novo lançamento</h3>
+    <div class="campo">
+      <label for="lanc-desc">Descrição</label>
+      <input type="text" id="lanc-desc" placeholder="Ex.: Internet">
+    </div>
+    <div class="campo">
+      <label for="lanc-tipo">Tipo</label>
+      <select id="lanc-tipo">
+        <option value="pagar">A pagar</option>
+        <option value="receber">A receber</option>
+      </select>
+    </div>
+    <div class="campo">
+      <label for="lanc-valor">Valor (R$)</label>
+      <input type="number" id="lanc-valor" min="0.01" step="0.01" placeholder="0,00">
+    </div>
+    <div class="campo">
+      <label for="lanc-data">Data</label>
+      <input type="date" id="lanc-data">
+    </div>
+    <p id="msg-modal-lanc" class="modal-msg"></p>
+    <div class="modal-acoes">
+      <button type="button" class="btn-secondary" onclick="fecharModalLancamento()">Cancelar</button>
+      <button type="button" class="btn-primary" onclick="salvarLancamento()">Salvar</button>
+    </div>
   </div>
 </div>
 
@@ -379,23 +609,36 @@ supabaseClient = window._supabaseClient;
         return p.charAt(0).toUpperCase() + p.slice(1);
       }
 
-      const perfilTxt = labelPerfil(data.perfil);
-      let empresaTxt = data.empresa || "";
-      if (/^mestre-/i.test(empresaTxt)) {
-        empresaTxt = empresaTxt.replace(/^mestre-/i, "");
+      function nomeEmpresaParaExibir(nomeEmpresa, perfilRaw) {
+        let s = String(nomeEmpresa || "").trim();
+        const pr = String(perfilRaw || "").toLowerCase();
+        if (pr === "mestre" || pr === "master") {
+          s = s.replace(/^mestre[\s\-–]+/i, "").trim();
+        }
+        return s || "Empresa";
       }
 
+      const perfilTxt = labelPerfil(data.perfil);
+      const empresaNome =
+        data.empresa_nome || data.empresa || "";
+      const empresaTxt = nomeEmpresaParaExibir(empresaNome, data.perfil);
+      const nomePessoa =
+        (data.nome_usuario || data.nome || "").trim() ||
+        (data.email || "").split("@")[0] ||
+        "Usuário";
+
       const nomeFinal =
-        "Olá " +
-        perfilTxt +
-        "-" +
-        empresaTxt +
-        " - " +
-        (data.nome || data.email);
+        "Olá " + perfilTxt + " - " + empresaTxt + " - " + nomePessoa;
 
       document.getElementById("nome").innerText = nomeFinal;
 
+      const perfilLc = String(data.perfil || "").toLowerCase();
+      const isMaster = perfilLc === "mestre" || perfilLc === "master";
+      const btnCad = document.getElementById("btn-cadastrar-usuario");
+      if (btnCad) btnCad.style.display = isMaster ? "inline-flex" : "none";
+
       window.TOKEN = token;
+      window.DASH_PERFIL = data;
       carregarTransacoes();
 
     } catch (erro) {
@@ -417,6 +660,163 @@ supabaseClient = window._supabaseClient;
     const v = t.valor ?? t.valentia;
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
+  }
+
+  function textoCelulaData(row) {
+    const raw = row.dados ?? row.data ?? row.data_lancamento;
+    if (raw == null || raw === "") return "—";
+    const s = String(raw).trim();
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    const br = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (br) return s;
+    return s;
+  }
+
+  function limparFiltroDatas() {
+    const de = document.getElementById("filtro-de");
+    const ate = document.getElementById("filtro-ate");
+    if (de) de.value = "";
+    if (ate) ate.value = "";
+    carregarTransacoes();
+  }
+
+  function abrirModalUsuario() {
+    const el = document.getElementById("modal-usuario");
+    const msg = document.getElementById("msg-modal-usuario");
+    if (msg) {
+      msg.textContent = "";
+      msg.className = "modal-msg";
+    }
+    if (el) el.classList.add("aberto");
+  }
+
+  function fecharModalUsuario() {
+    const el = document.getElementById("modal-usuario");
+    if (el) el.classList.remove("aberto");
+  }
+
+  function abrirModalLancamento() {
+    const el = document.getElementById("modal-lancamento");
+    const msg = document.getElementById("msg-modal-lanc");
+    const dataInp = document.getElementById("lanc-data");
+    if (dataInp && !dataInp.value) {
+      dataInp.value = new Date().toISOString().slice(0, 10);
+    }
+    if (msg) {
+      msg.textContent = "";
+      msg.className = "modal-msg";
+    }
+    if (el) el.classList.add("aberto");
+  }
+
+  function fecharModalLancamento() {
+    const el = document.getElementById("modal-lancamento");
+    if (el) el.classList.remove("aberto");
+  }
+
+  async function salvarNovoUsuario() {
+    const msg = document.getElementById("msg-modal-usuario");
+    const nome = document.getElementById("novo-user-nome")?.value?.trim();
+    const email = document.getElementById("novo-user-email")?.value?.trim();
+    const password = document.getElementById("novo-user-senha")?.value || "";
+    const perfil = document.getElementById("novo-user-perfil")?.value || "operador";
+
+    if (msg) {
+      msg.textContent = "";
+      msg.className = "modal-msg";
+    }
+
+    try {
+      const response = await fetch("/usuarios", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + window.TOKEN,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ nome, email, password, perfil })
+      });
+      const corpo = await response.text();
+      let j;
+      try {
+        j = corpo ? JSON.parse(corpo) : {};
+      } catch {
+        j = {};
+      }
+      if (!response.ok) {
+        if (msg) {
+          msg.textContent = j.error || corpo.slice(0, 200) || "Erro ao cadastrar";
+          msg.classList.add("erro");
+        }
+        return;
+      }
+      if (msg) {
+        msg.textContent = "Usuário cadastrado com sucesso.";
+        msg.classList.add("ok");
+      }
+      document.getElementById("novo-user-nome").value = "";
+      document.getElementById("novo-user-email").value = "";
+      document.getElementById("novo-user-senha").value = "";
+    } catch (e) {
+      console.error(e);
+      if (msg) {
+        msg.textContent = "Falha de rede ao cadastrar.";
+        msg.classList.add("erro");
+      }
+    }
+  }
+
+  async function salvarLancamento() {
+    const msg = document.getElementById("msg-modal-lanc");
+    const descricao = document.getElementById("lanc-desc")?.value?.trim();
+    const tipo = document.getElementById("lanc-tipo")?.value;
+    const valor = Number(document.getElementById("lanc-valor")?.value);
+    const dados = document.getElementById("lanc-data")?.value;
+
+    if (msg) {
+      msg.textContent = "";
+      msg.className = "modal-msg";
+    }
+
+    try {
+      const response = await fetch("/transacoes", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + window.TOKEN,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          descricao,
+          tipo,
+          valor,
+          dados: dados || undefined
+        })
+      });
+      const corpo = await response.text();
+      let j;
+      try {
+        j = corpo ? JSON.parse(corpo) : {};
+      } catch {
+        j = {};
+      }
+      if (!response.ok) {
+        if (msg) {
+          msg.textContent = j.error || j.detalhe || corpo.slice(0, 160) || "Erro ao salvar";
+          msg.classList.add("erro");
+        }
+        return;
+      }
+      fecharModalLancamento();
+      document.getElementById("lanc-desc").value = "";
+      document.getElementById("lanc-valor").value = "";
+      carregarTransacoes();
+    } catch (e) {
+      console.error(e);
+      if (msg) {
+        msg.textContent = "Falha de rede ao salvar.";
+        msg.classList.add("erro");
+      }
+    }
   }
 
   function tipoMovimento(t) {
@@ -507,7 +907,16 @@ supabaseClient = window._supabaseClient;
       if (tabela) tabela.style.display = "none";
       tbody.innerHTML = "";
 
-      const response = await fetch("/transacoes", {
+      const de = document.getElementById("filtro-de")?.value || "";
+      const ate = document.getElementById("filtro-ate")?.value || "";
+      let urlTrans = "/transacoes";
+      const qs = new URLSearchParams();
+      if (de) qs.set("de", de);
+      if (ate) qs.set("ate", ate);
+      const q = qs.toString();
+      if (q) urlTrans += "?" + q;
+
+      const response = await fetch(urlTrans, {
         headers: {
           Authorization: "Bearer " + window.TOKEN
         }
@@ -565,6 +974,8 @@ supabaseClient = window._supabaseClient;
         const desc =
           t.descricao ?? t["descrição"] ?? "—";
         const tr = document.createElement("tr");
+        const tdData = document.createElement("td");
+        tdData.textContent = textoCelulaData(t);
         const tdD = document.createElement("td");
         tdD.textContent = desc;
         const tdT = document.createElement("td");
@@ -584,6 +995,7 @@ supabaseClient = window._supabaseClient;
         const tdV = document.createElement("td");
         tdV.className = "num";
         tdV.textContent = formatBRL(valor);
+        tr.appendChild(tdData);
         tr.appendChild(tdD);
         tr.appendChild(tdT);
         tr.appendChild(tdV);
